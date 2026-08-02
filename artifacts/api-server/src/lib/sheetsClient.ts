@@ -1,15 +1,19 @@
 /**
- * Authenticated Google Sheets client using a service-account credential.
+ * Authenticated Google API client factory using a service-account credential.
  *
  * Required env vars:
  *   GOOGLE_SERVICE_ACCOUNT_JSON  — base64-encoded service-account JSON key file
  *   GOOGLE_SHEET_ID              — target spreadsheet ID
  *
- * Scope: spreadsheets (read + write). No per-user OAuth needed.
+ * Scopes:
+ *   - spreadsheets (read + write) — for Sheets upsert
+ *   - drive.readonly              — for Drive folder polling
  */
 
 import { google } from "googleapis";
 import { logger } from "./logger.js";
+
+// ─── Credential helpers ───────────────────────────────────────────────────────
 
 function getServiceAccountJson(): object {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -34,19 +38,41 @@ export function getSheetId(): string {
   return id;
 }
 
-/** Lazily initialised authenticated sheets client. */
+// ─── Shared auth (both scopes so one credential covers Sheets + Drive) ────────
+
+let _auth: InstanceType<typeof google.auth.GoogleAuth> | null = null;
+
+function getAuth(): InstanceType<typeof google.auth.GoogleAuth> {
+  if (_auth) return _auth;
+  const credentials = getServiceAccountJson();
+  _auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: [
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/drive.readonly",
+    ],
+  });
+  return _auth;
+}
+
+// ─── Sheets client ────────────────────────────────────────────────────────────
+
 let _sheets: ReturnType<typeof google.sheets> | null = null;
 
 export function getSheetsClient(): ReturnType<typeof google.sheets> {
   if (_sheets) return _sheets;
-
-  const credentials = getServiceAccountJson();
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-
-  _sheets = google.sheets({ version: "v4", auth });
+  _sheets = google.sheets({ version: "v4", auth: getAuth() });
   logger.info("Google Sheets client initialised");
   return _sheets;
+}
+
+// ─── Drive client ─────────────────────────────────────────────────────────────
+
+let _drive: ReturnType<typeof google.drive> | null = null;
+
+export function getDriveClient(): ReturnType<typeof google.drive> {
+  if (_drive) return _drive;
+  _drive = google.drive({ version: "v3", auth: getAuth() });
+  logger.info("Google Drive client initialised");
+  return _drive;
 }

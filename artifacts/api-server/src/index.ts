@@ -1,6 +1,7 @@
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { ensureHeaderRow } from "./lib/sheetsSync.js";
+import { startDrivePoller } from "./lib/drivePoller.js";
 
 const rawPort = process.env["PORT"];
 
@@ -24,15 +25,23 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
-  // Initialise Google Sheet header row in the background.
-  // Skips gracefully if credentials are not yet configured.
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_SHEET_ID) {
+  const hasGoogleCreds =
+    !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON &&
+    !!process.env.GOOGLE_SHEET_ID;
+
+  if (hasGoogleCreds) {
+    // Initialise Google Sheet header row
     ensureHeaderRow().catch((initErr: unknown) => {
       logger.warn({ err: initErr }, "Could not initialise Sheet header row");
     });
+
+    // Start Drive folder poller (skips gracefully if GOOGLE_DRIVE_FOLDER_ID not set)
+    startDrivePoller().catch((initErr: unknown) => {
+      logger.warn({ err: initErr }, "Could not start Drive poller");
+    });
   } else {
     logger.info(
-      "GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SHEET_ID not set — skipping Sheet init",
+      "GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SHEET_ID not set — skipping Sheet init and Drive poller",
     );
   }
 });

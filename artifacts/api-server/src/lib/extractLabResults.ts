@@ -35,6 +35,11 @@ STRICT RULES:
 export interface ExtractionLLMError {
   kind: "llm_error";
   reason: string;
+  /**
+   * true  → transient error (API/network/rate-limit/JSON instability); safe to retry.
+   * false → permanent error (text too short, unreadable); retrying the same file won't help.
+   */
+  retryable: boolean;
 }
 
 /**
@@ -45,7 +50,11 @@ export async function extractLabResultsFromText(
   text: string,
 ): Promise<LabResultRow[] | ExtractionLLMError> {
   if (!text || text.trim().length < 20) {
-    return { kind: "llm_error", reason: "Extracted text is too short to process" };
+    return {
+      kind: "llm_error",
+      reason: "Extracted text is too short to process",
+      retryable: false, // Corrupted / blank PDF — retrying won't help
+    };
   }
 
   // Truncate extremely long texts to fit within model context (keep ~60k chars)
@@ -69,11 +78,19 @@ export async function extractLabResultsFromText(
     rawContent = response.choices[0]?.message?.content ?? null;
   } catch (err) {
     logger.error({ err }, "OpenAI API call failed");
-    return { kind: "llm_error", reason: `LLM call failed: ${String(err)}` };
+    return {
+      kind: "llm_error",
+      reason: `LLM call failed: ${String(err)}`,
+      retryable: true, // Network / rate-limit / server error — worth retrying
+    };
   }
 
   if (!rawContent) {
-    return { kind: "llm_error", reason: "LLM returned empty content" };
+    return {
+      kind: "llm_error",
+      reason: "LLM returned empty content",
+      retryable: true, // Model instability — retry may succeed
+    };
   }
 
   // Strip optional markdown code fence if the model wrapped the JSON
@@ -90,11 +107,16 @@ export async function extractLabResultsFromText(
     return {
       kind: "llm_error",
       reason: `LLM response could not be parsed as JSON: ${cleaned.slice(0, 200)}`,
+      retryable: true, // Model instability / hallucinated markdown — retry may succeed
     };
   }
 
   if (!Array.isArray(parsed)) {
-    return { kind: "llm_error", reason: "LLM response is not a JSON array" };
+    return {
+      kind: "llm_error",
+      reason: "LLM response is not a JSON array",
+      retryable: true, // Model instability — retry may succeed
+    };
   }
 
   // Validate and coerce each row

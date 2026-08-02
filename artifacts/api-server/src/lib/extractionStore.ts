@@ -17,7 +17,7 @@ export interface ExtractionSuccess {
   messageId: string;
   timestamp: string;
   rows: LabResultRow[];
-  source: "whatsapp";
+  source: "whatsapp" | "drive";
 }
 
 export interface ExtractionError {
@@ -26,7 +26,7 @@ export interface ExtractionError {
   messageId: string;
   timestamp: string;
   reason: string;
-  source: "whatsapp";
+  source: "whatsapp" | "drive";
 }
 
 export type ExtractionResult = ExtractionSuccess | ExtractionError;
