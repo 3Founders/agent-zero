@@ -43,6 +43,13 @@ function Steps({ items }: { items: React.ReactNode[] }) {
   );
 }
 
+function encodeBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 /** Build fetch headers including Basic auth if a password is already stored. */
 function setupHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const stored = localStorage.getItem('adminPassword');
@@ -59,7 +66,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   
   // Accumulated state
   const [serviceAccountJson, setServiceAccountJson] = useState<string>('');
+  const [serviceAccountJsonText, setServiceAccountJsonText] = useState('');
   const [clientEmail, setClientEmail] = useState<string>('');
+  const [googleJsonError, setGoogleJsonError] = useState('');
   
   const [sheetUrl, setSheetUrl] = useState('');
   const [sheetId, setSheetId] = useState('');
@@ -86,32 +95,38 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const [waError, setWaError] = useState('');
   
   // Handlers for Step 1
+  const handleServiceAccountJsonText = (text: string) => {
+    setServiceAccountJsonText(text);
+    setClientEmail('');
+    setServiceAccountJson('');
+    setGoogleJsonError('');
+
+    if (!text.trim()) return;
+
+    try {
+      const json = JSON.parse(text) as Record<string, unknown>;
+      if (typeof json.client_email !== 'string' || !json.client_email) {
+        setGoogleJsonError('This JSON is missing client_email. Paste the complete service-account JSON key.');
+        return;
+      }
+      if (typeof json.private_key !== 'string' || !json.private_key) {
+        setGoogleJsonError('This JSON is missing private_key. Download the service-account JSON key, not an OAuth client file.');
+        return;
+      }
+      setClientEmail(json.client_email);
+      setServiceAccountJson(encodeBase64(text));
+    } catch {
+      setGoogleJsonError('This is not valid JSON. Paste the complete contents of the downloaded .json file.');
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     const reader = new FileReader();
     reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const json = JSON.parse(text);
-        if (!json.client_email) {
-          toast({
-            title: "Invalid file",
-            description: "No client_email found in JSON.",
-            variant: "destructive"
-          });
-          return;
-        }
-        setClientEmail(json.client_email);
-        setServiceAccountJson(btoa(text));
-      } catch (err) {
-        toast({
-          title: "Invalid file",
-          description: "Could not parse JSON.",
-          variant: "destructive"
-        });
-      }
+      handleServiceAccountJsonText(event.target?.result as string);
     };
     reader.readAsText(file);
   };
@@ -275,7 +290,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               <CardHeader>
                 <CardTitle>Connect Google</CardTitle>
                 <CardDescription>
-                  Download your service-account JSON key from Google Cloud Console, then upload it here. No base64 or terminal needed.
+                  Paste the complete service-account JSON key below, or upload the downloaded .json file. Never paste an API key or password here.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -284,8 +299,32 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                   <><A href="https://console.cloud.google.com/apis/library/sheets.googleapis.com">Enable Google Sheets API</A> and <A href="https://console.cloud.google.com/apis/library/drive.googleapis.com">Google Drive API</A></>,
                   <>Go to <A href="https://console.cloud.google.com/iam-admin/serviceaccounts">Service Accounts</A> → <strong>+ Create Service Account</strong> → any name → Role: <strong>Editor</strong> → <strong>Done</strong></>,
                   <>Click the new service account → <strong>Keys</strong> tab → <strong>Add Key → Create new key → JSON</strong> → a file downloads to your computer</>,
-                  <>Click the box below and select that downloaded file</>,
+                  <>Open the downloaded file in a text editor, copy everything from the first <code className="text-xs bg-muted px-1 rounded">{'{'}</code> to the last <code className="text-xs bg-muted px-1 rounded">{'}'}</code>, then paste it below</>,
                 ]} />
+
+                <div className="space-y-2">
+                  <Label htmlFor="serviceAccountJson">Google service-account JSON</Label>
+                  <Textarea
+                    id="serviceAccountJson"
+                    placeholder={'Paste the complete JSON here, starting with {\n"type": "service_account",\n...'}
+                    value={serviceAccountJsonText}
+                    onChange={(e) => handleServiceAccountJsonText(e.target.value)}
+                    className="min-h-32 font-mono text-xs"
+                    spellCheck={false}
+                  />
+                  {googleJsonError && (
+                    <div className="text-sm text-destructive flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{googleJsonError}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="h-px bg-border flex-1" />
+                  <span>or upload the file</span>
+                  <div className="h-px bg-border flex-1" />
+                </div>
 
                 <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center relative hover:bg-muted/30 transition-colors text-center">
                   <UploadCloud className="w-8 h-8 text-muted-foreground mb-3" />
