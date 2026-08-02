@@ -195,3 +195,26 @@ export function stopReminderScheduler(): void {
     logger.info("Dose reminder scheduler stopped");
   }
 }
+
+export interface SchedulerStatus {
+  running: boolean;
+  timezone: string;
+  morningTime: string;
+  eveningTime: string;
+  activeParticipantCount: number;
+}
+
+export function getSchedulerStatus(): SchedulerStatus {
+  const tz = getTimezone();
+  const morning = parseTime("REMINDER_MORNING_TIME", "08:00");
+  const evening = parseTime("REMINDER_EVENING_TIME", "20:00");
+  const fmt = (t: { h: number; m: number }) =>
+    `${String(t.h).padStart(2, "0")}:${String(t.m).padStart(2, "0")}`;
+  return {
+    running: _intervalId !== null,
+    timezone: tz,
+    morningTime: fmt(morning),
+    eveningTime: fmt(evening),
+    activeParticipantCount: getActiveParticipants().length,
+  };
+}

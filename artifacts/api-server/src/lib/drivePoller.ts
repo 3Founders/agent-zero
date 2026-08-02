@@ -309,6 +309,37 @@ async function trySendDriveReply(
 
 // ─── Main poller ──────────────────────────────────────────────────────────────
 
+// ─── Poller status (readable by admin route) ─────────────────────────────────
+
+export interface DrivePollerStatus {
+  running: boolean;
+  folderId: string | null;
+  intervalMs: number;
+  lastPollTime: string | null;
+  processedCount: number;
+  pendingRetryCount: number;
+  pendingRetryFiles: string[];
+}
+
+let _pollerStatus: DrivePollerStatus = {
+  running: false,
+  folderId: null,
+  intervalMs: 60_000,
+  lastPollTime: null,
+  processedCount: 0,
+  pendingRetryCount: 0,
+  pendingRetryFiles: [],
+};
+
+export function getDrivePollerStatus(): DrivePollerStatus {
+  return {
+    ..._pollerStatus,
+    processedCount: processed.size,
+    pendingRetryCount: pendingRetry.size,
+    pendingRetryFiles: Array.from(pendingRetry.values()).map((f) => f.name),
+  };
+}
+
 let _pollerStarted = false;
 
 /**
@@ -332,6 +363,10 @@ export async function startDrivePoller(
 
   // Look back one interval so files added just before server start are caught.
   let lastPollTime = new Date(Date.now() - intervalMs).toISOString();
+
+  _pollerStatus.running = true;
+  _pollerStatus.folderId = folderId;
+  _pollerStatus.intervalMs = intervalMs;
 
   logger.info({ folderId, intervalMs }, "Drive poller started");
 

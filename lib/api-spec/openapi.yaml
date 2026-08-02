@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: admin
+    description: Trial coordinator admin endpoints
 paths:
   /healthz:
     get:
@@ -24,6 +26,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /admin/status:
+    get:
+      operationId: getAdminStatus
+      tags: [admin]
+      summary: Full system status snapshot
+      description: >
+        Returns all extraction results (from WhatsApp and Drive), Drive poller
+        health, and scheduler state. Protected by ADMIN_PASSWORD basic auth.
+      responses:
+        "200":
+          description: System status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStatus"
+        "401":
+          description: Unauthorized
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +55,77 @@ components:
       required:
         - status
 
+    AdminStatus:
+      type: object
+      required: [extractions, drivePoller, scheduler, serverTime]
+      properties:
+        extractions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtractionEntry"
+        drivePoller:
+          $ref: "#/components/schemas/DrivePollerStatus"
+        scheduler:
+          $ref: "#/components/schemas/SchedulerStatus"
+        serverTime:
+          type: string
+          description: ISO timestamp from the server
+
+    ExtractionEntry:
+      type: object
+      required: [messageId, participantId, timestamp, source, status]
+      properties:
+        messageId:
+          type: string
+        participantId:
+          type: string
+        timestamp:
+          type: string
+        source:
+          type: string
+          enum: [whatsapp, drive]
+        status:
+          type: string
+          enum: [success, error]
+        rowCount:
+          type: ["number", "null"]
+          description: Number of lab-result rows extracted (null on error)
+        reason:
+          type: ["string", "null"]
+          description: Error reason (null on success)
+
+    DrivePollerStatus:
+      type: object
+      required: [running, processedCount, pendingRetryCount, pendingRetryFiles]
+      properties:
+        running:
+          type: boolean
+        folderId:
+          type: ["string", "null"]
+        intervalMs:
+          type: number
+        lastPollTime:
+          type: ["string", "null"]
+        processedCount:
+          type: number
+        pendingRetryCount:
+          type: number
+        pendingRetryFiles:
+          type: array
+          items:
+            type: string
+
+    SchedulerStatus:
+      type: object
+      required: [running, timezone, morningTime, eveningTime, activeParticipantCount]
+      properties:
+        running:
+          type: boolean
+        timezone:
+          type: string
+        morningTime:
+          type: string
+        eveningTime:
+          type: string
+        activeParticipantCount:
+          type: number

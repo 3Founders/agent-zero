@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Trial Coordinator Dashboard"
+description = "Internal dashboard for the clinical trial coordinator. Shows a live feed of all PDF extraction results (from WhatsApp and Google Drive), Drive poller health, and dose-reminder scheduler status. Auto-refreshes every 30 seconds. Protected by a shared admin password."
+version = "1.0.0"
+id = "artifacts/dashboard"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23183
+
+[services.development]
+run = "pnpm --filter @workspace/dashboard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/dashboard", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/dashboard/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23183"
+BASE_PATH = "/"
