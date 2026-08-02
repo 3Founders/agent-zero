@@ -22,9 +22,9 @@ import { getActiveParticipants } from "./demographicsSheet.js";
 type ReminderSlot = "morning" | "evening";
 
 const MORNING_MESSAGE =
-  "☀️ Good morning! Did you take your *morning probiotic dose* today?\n\nReply *yes*, *no*, or *skip*.";
+  "Good morning! Did you take your *morning probiotic dose* today?\n\nReply *yes*, *no*, or *skip*.";
 const EVENING_MESSAGE =
-  "🌙 Good evening! Did you take your *evening probiotic dose* today?\n\nReply *yes*, *no*, or *skip*.";
+  "Good evening! Did you take your *evening probiotic dose* today?\n\nReply *yes*, *no*, or *skip*.";
 
 // ─── Config helpers ───────────────────────────────────────────────────────────
 
@@ -194,6 +194,15 @@ export function stopReminderScheduler(): void {
     _intervalId = null;
     logger.info("Dose reminder scheduler stopped");
   }
+}
+
+/**
+ * Stop and restart the scheduler. Called by the setup wizard after
+ * WhatsApp credentials are saved via the config store.
+ */
+export function restartReminderScheduler(): void {
+  stopReminderScheduler();
+  startReminderScheduler();
 }
 
 export interface SchedulerStatus {

@@ -16,7 +16,7 @@
  * Processed-file state is kept in memory and flushed to a JSON sidecar
  * (processed-files.json in the process CWD) to survive restarts.
  *
- * Required env vars:
+ * Required env vars / config:
  *   GOOGLE_DRIVE_FOLDER_ID     — Drive folder to watch
  *   GOOGLE_SERVICE_ACCOUNT_JSON + GOOGLE_SHEET_ID — from Task 2
  *
@@ -25,7 +25,6 @@
  */
 
 import { readFile, writeFile } from "fs/promises";
-import { tmpdir } from "os";
 import { join } from "path";
 import { logger } from "./logger.js";
 import { getDriveClient } from "./sheetsClient.js";
@@ -40,6 +39,7 @@ import {
   composeErrorReply,
   composeEmptyReply,
 } from "./replyComposer.js";
+import { getConfigValue } from "./configStore.js";
 
 /** Minimal log interface satisfied by both the singleton logger and child loggers. */
 type Log = Pick<typeof logger, "info" | "error" | "warn" | "debug">;
@@ -285,7 +285,7 @@ async function processFile(file: DriveFile): Promise<ProcessResult> {
     } catch {
       replyText =
         llmResult.length > 0
-          ? `✅ Extracted ${llmResult.length} markers from your report.`
+          ? `Extracted ${llmResult.length} markers from your report.`
           : composeErrorReply();
     }
     await trySendDriveReply(phone, replyText, log);
@@ -343,6 +343,24 @@ export function getDrivePollerStatus(): DrivePollerStatus {
 let _pollerStarted = false;
 
 /**
+ * Reset the poller guard so startDrivePoller() can be called again.
+ * Used by the setup wizard after saving a new Drive folder ID.
+ */
+export function resetDrivePoller(): void {
+  _pollerStarted = false;
+  _pollerStatus = {
+    running: false,
+    folderId: null,
+    intervalMs: 60_000,
+    lastPollTime: null,
+    processedCount: 0,
+    pendingRetryCount: 0,
+    pendingRetryFiles: [],
+  };
+  logger.info("Drive poller reset — will restart on next startDrivePoller() call");
+}
+
+/**
  * Start the Drive folder poller. Safe to call multiple times — only starts once.
  * Uses a recursive setTimeout so ticks never overlap — the next tick is only
  * scheduled after the current one fully completes.
@@ -353,7 +371,7 @@ export async function startDrivePoller(
   if (_pollerStarted) return;
   _pollerStarted = true;
 
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  const folderId = getConfigValue("GOOGLE_DRIVE_FOLDER_ID");
   if (!folderId) {
     logger.warn("GOOGLE_DRIVE_FOLDER_ID not set — Drive poller disabled");
     return;
@@ -437,8 +455,9 @@ export async function startDrivePoller(
       }
     }
 
-    // Advance the time window only after a successful tick
+    // Update lastPollTime and status after a successful tick
     lastPollTime = tickStart;
+    _pollerStatus.lastPollTime = tickStart;
   };
 
   // Recursive setTimeout: next tick only fires after current tick finishes.

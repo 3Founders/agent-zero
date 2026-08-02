@@ -13,3 +13,4 @@ export * from './extractionEntrySource';
 export * from './extractionEntryStatus';
 export * from './healthStatus';
 export * from './schedulerStatus';
+export * from './setupStatus';

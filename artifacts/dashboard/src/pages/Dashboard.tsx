@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, HardDrive, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, HardDrive, Clock, AlertCircle, CheckCircle2, Settings } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { Link } from 'wouter';
 
 export function Dashboard() {
   const queryClient = useQueryClient();
@@ -76,16 +77,24 @@ export function Dashboard() {
               Last updated: {format(parseISO(serverTime), "MMM d, yyyy HH:mm:ss")}
             </p>
           </div>
-          <Button 
-            onClick={handleRefresh} 
-            variant="outline" 
-            size="sm"
-            className="gap-2 shrink-0 self-start sm:self-auto"
-            disabled={isFetching}
-          >
-            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex gap-2 shrink-0 self-start sm:self-auto">
+            <Link href="/setup">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="w-4 h-4" />
+                Settings
+              </Button>
+            </Link>
+            <Button 
+              onClick={handleRefresh} 
+              variant="outline" 
+              size="sm"
+              className="gap-2"
+              disabled={isFetching}
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </header>
 
         {/* Status Cards */}

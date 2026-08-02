@@ -1,282 +1,168 @@
 # How to Set Up Agent 0 — Step-by-Step Guide
 
-This guide explains how to get each secret key the app needs.  
-Read slowly. Each step has pictures described in words.  
-Ask for help if something looks different on your screen.
+This guide explains how to connect your WhatsApp and Google accounts to Agent 0.
+
+There are two ways to set up:
+- **Option A — Setup Wizard (recommended):** Use the in-app wizard. No terminal, no copy-pasting long codes.
+- **Option B — Replit Secrets (for deployed apps):** Paste values directly into Replit's Secrets panel.
 
 ---
 
-## What is a "Secret"?
+## Option A — Setup Wizard (Recommended)
 
-A secret is like a password. It tells the app:
-- Which WhatsApp account to use
-- Which Google Sheet to write to
-- Who is allowed to see the dashboard
+Open the dashboard in your browser. If the app is not yet configured, it will show the setup wizard automatically. You can also open it any time by clicking the **Settings** icon in the top-right corner of the dashboard.
 
-You will type each secret into the Replit "Secrets" panel (left side of the screen, looks like a lock icon 🔒).
+The wizard has 5 steps:
 
 ---
 
-## List of Secrets
+### Step 1 — Connect Google (upload JSON key)
 
-| Secret Name | What it does | Where to get it |
-|---|---|---|
-| `ADMIN_PASSWORD` | Protects the dashboard | You choose it |
-| `WHATSAPP_VERIFY_TOKEN` | Proves your server to Meta | You choose it |
-| `WHATSAPP_APP_SECRET` | Checks WhatsApp messages are real | Meta Developer Portal |
-| `WHATSAPP_ACCESS_TOKEN` | Lets the app send WhatsApp messages | Meta Developer Portal |
-| `WHATSAPP_PHONE_NUMBER_ID` | Your WhatsApp business number | Meta Developer Portal |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Lets the app write to Google Sheets | Google Cloud Console |
-| `GOOGLE_SHEET_ID` | Which spreadsheet to use | Google Sheets URL |
-| `GOOGLE_DRIVE_FOLDER_ID` | Which Drive folder to watch for PDFs | Google Drive URL |
+The app needs to write lab results to a Google Sheet. To allow this, you need to create a "service account" in Google Cloud — a special Google account just for apps.
 
----
+**Create the service account:**
 
-## Secret 1 — ADMIN_PASSWORD
+1. Go to: **https://console.cloud.google.com**
+2. Sign in with your Google account
+3. Click the project name at the top → **New Project** → name it `AgentZero` → click **Create**
+4. In the left menu: **APIs & Services > Library**
+5. Search `Google Sheets API` → click it → click **Enable**
+6. Search `Google Drive API` → click it → click **Enable**
+7. In the left menu: **APIs & Services > Credentials**
+8. Click **+ Create Credentials** → choose **Service Account**
+9. Name: `agent-zero-bot` → click **Create and Continue** → Role: **Editor** → **Done**
+10. Click the service account you just created → **Keys** tab → **Add Key > Create new key** → choose **JSON** → click **Create**
+11. A JSON file downloads to your computer
 
-**You choose this yourself.** It is the password to open the dashboard.
-
-Example: `Trial2024`
-
-Rules:
-- No spaces
-- Use letters and numbers only
-- Do not share it with participants
-
-**Steps:**
-1. Think of a password
-2. In Replit, click Secrets (lock icon on the left)
-3. Click **+ New Secret**
-4. Name: `ADMIN_PASSWORD`
-5. Value: your password
-6. Click **Save**
+**In the wizard:**
+1. Click the dashed box labelled "Click to upload JSON key"
+2. Select the JSON file you just downloaded
+3. The wizard will show the service account email (e.g. `agent-zero-bot@agentZero.iam.gserviceaccount.com`) — copy it, you need it in Step 2
+4. Click **Next**
 
 ---
 
-## Secret 2 — WHATSAPP_VERIFY_TOKEN
+### Step 2 — Connect your spreadsheet
 
-**You choose this yourself.** It can be any random word or phrase. You will use it again later when setting up the Meta webhook.
-
-Example: `guttrialbot2024`
-
-**Steps:**
-1. Think of a random word (no spaces)
-2. Save it somewhere (you will need it again in Meta)
-3. Add to Replit Secrets:
-   - Name: `WHATSAPP_VERIFY_TOKEN`
-   - Value: your random word
+1. Create a new Google Sheet (or open an existing one) at **https://sheets.google.com**
+2. Click **Share** (top right of the sheet) → paste the service account email from Step 1 → role: **Editor** → click **Send**
+3. Copy the full URL of the sheet from your browser address bar
+4. Paste the URL into the wizard. The wizard will extract the ID automatically.
+5. Click **Test connection** — you will see a green message like "Connected: My Trial Results" if it works
+6. Click **Next**
 
 ---
 
-## Secrets 3, 4, 5 — WhatsApp (from Meta Developer Portal)
+### Step 3 — Watch a Drive folder (optional)
 
-These three come from the same place: **Meta for Developers**.
+Only needed if participants will upload PDF reports to a shared Google Drive folder.
 
-### Step A — Create a Meta Developer Account
+1. Open the Google Drive folder in your browser
+2. Copy the full URL from the address bar
+3. Paste it into the wizard. The wizard extracts the folder ID automatically.
+4. Click **Next** (or click **Skip** if you don't need this)
+
+---
+
+### Step 4 — Connect WhatsApp
+
+You need a Meta Developer account and a WhatsApp Business number.
+
+**Create a Meta Developer account (if you don't have one):**
 
 1. Go to: **https://developers.facebook.com**
-2. Click **Get Started** (top right)
-3. Sign in with your Facebook account
-4. Follow the steps to register as a developer (just click Next/Agree)
+2. Click **Get Started** → sign in with Facebook → follow the steps
 
-### Step B — Create a Meta App
+**Create a Meta App:**
 
-1. On the dashboard, click **Create App**
-2. Choose **Business** as the app type → click **Next**
-3. Give it a name, example: `GutTrialBot`
-4. Click **Create App**
+1. On the dashboard, click **Create App** → choose **Business** → name it `GutTrialBot` → click **Create App**
+2. Scroll down to **WhatsApp** → click **Set up**
 
-### Step C — Add WhatsApp to the App
+**Get your 4 values from the WhatsApp API Setup page:**
 
-1. In your app dashboard, scroll down to find **WhatsApp**
-2. Click **Set up** next to WhatsApp
-3. You will see the **WhatsApp API Setup** page
+| Field | Where to find it |
+|---|---|
+| Access Token | Temporary access token box on API Setup page (see permanent token steps below) |
+| Phone Number ID | "Phone number ID" box on API Setup page |
+| Verify Token | A random word you choose yourself (e.g. `guttrialbot2024`) |
+| App Secret | App Settings > Basic > App secret > click Show |
 
-### Step D — Get Your Three Secrets
+**Paste all 4 values** into the wizard. Click **Test connection** — you will see your WhatsApp number if the token is valid.
 
-On the **WhatsApp > API Setup** page, you will see:
+Click **Next**.
 
-**Phone Number ID**
-- Look for a box labelled **Phone number ID**
-- Copy the number (looks like: `123456789012345`)
-- Save in Replit as `WHATSAPP_PHONE_NUMBER_ID`
-
-**Access Token (Temporary)**
-- Look for a box labelled **Temporary access token**
-- Click the copy icon next to it
-- Save in Replit as `WHATSAPP_ACCESS_TOKEN`
-
-> ⚠️ This token expires in 24 hours. For permanent use, you must create a **System User token** (see extra steps below).
-
-**App Secret**
-1. In the left menu, click **App Settings > Basic**
-2. Find the field **App secret**
-3. Click **Show** → enter your Facebook password
-4. Copy the value
-5. Save in Replit as `WHATSAPP_APP_SECRET`
+> **Make the Access Token permanent (important!):**
+> The temporary token expires in 24 hours. To get a permanent one:
+> 1. Go to **https://business.facebook.com** > Settings > System Users
+> 2. Click **Add** → name it `AgentBot` → role: **Admin**
+> 3. Click the user → **Add Assets** → select your WhatsApp app → **Full control**
+> 4. Click **Generate New Token** → select your app → tick `whatsapp_business_messaging` and `whatsapp_business_management`
+> 5. Copy the token and paste it back into the wizard (Settings → Step 4)
 
 ---
 
-### How to Get a Permanent Access Token (System User)
+### Step 5 — Set a dashboard password
 
-The temporary token above stops working after 24 hours. Do this to get one that never expires:
+Choose a password for the dashboard. Anyone who knows this password can view the extraction history and system status.
 
-1. Go to **https://business.facebook.com**
-2. Click **Settings** (gear icon, bottom left)
-3. Click **System Users** (left menu)
-4. Click **Add** → name it `AgentBot` → role: **Admin** → click **Create System User**
-5. Click the system user you just created → click **Add Assets**
-6. Select your WhatsApp app → give it **Full control** → click **Save**
-7. Click **Generate New Token** → select your app → tick these permissions:
-   - `whatsapp_business_messaging`
-   - `whatsapp_business_management`
-8. Click **Generate Token** → copy it
-9. Save in Replit as `WHATSAPP_ACCESS_TOKEN` (replace the old one)
+- Type your password and confirm it
+- Click **Finish setup**
+
+The wizard will save all your settings and open the dashboard.
 
 ---
 
-### Set Up the Webhook (So WhatsApp Sends Messages to Your App)
+### Set up the WhatsApp Webhook (one-time step after finishing the wizard)
+
+For WhatsApp to send messages to your app, you need to register a webhook in Meta:
 
 1. In the Meta app, go to **WhatsApp > Configuration**
 2. Under **Webhook**, click **Edit**
-3. Fill in:
-   - **Callback URL**: your Replit app URL + `/api/whatsapp/webhook`  
-     Example: `https://your-repl-name.replit.app/api/whatsapp/webhook`
-   - **Verify token**: the same value you used for `WHATSAPP_VERIFY_TOKEN`
-4. Click **Verify and Save**
-5. Under **Webhook fields**, find **messages** → click **Subscribe**
+3. **Callback URL**: your Replit app URL + `/api/whatsapp/webhook`
+   Example: `https://your-repl-name.replit.app/api/whatsapp/webhook`
+4. **Verify token**: the same value you entered in Step 4 above
+5. Click **Verify and Save**
+6. Under **Webhook fields**, find **messages** → click **Subscribe**
 
 ---
 
-## Secret 6 — GOOGLE_SERVICE_ACCOUNT_JSON
+## Option B — Replit Secrets (for production deployments)
 
-This lets the app write lab results to Google Sheets without needing anyone to log in.
+If you have deployed the app (published it), you can set credentials via Replit Secrets instead of the wizard. Values in Replit Secrets always take priority over the wizard settings.
 
-### Step A — Create a Google Cloud Project
+Go to the Secrets panel in Replit (lock icon on the left) and add:
 
-1. Go to: **https://console.cloud.google.com**
-2. Sign in with your Google account (the same one that owns the spreadsheet)
-3. At the top, click the project dropdown → click **New Project**
-4. Name: `AgentZero` → click **Create**
+| Secret | Value |
+|---|---|
+| `ADMIN_PASSWORD` | Your chosen dashboard password |
+| `WHATSAPP_VERIFY_TOKEN` | Your chosen verify token (random word) |
+| `WHATSAPP_APP_SECRET` | From Meta: App Settings > Basic > App secret |
+| `WHATSAPP_ACCESS_TOKEN` | Permanent system-user token from Meta |
+| `WHATSAPP_PHONE_NUMBER_ID` | From Meta: WhatsApp > API Setup |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Base64-encoded service-account JSON (see below) |
+| `GOOGLE_SHEET_ID` | ID from your Google Sheet URL (between `/d/` and `/edit`) |
+| `GOOGLE_DRIVE_FOLDER_ID` | ID from your Drive folder URL (after `/folders/`) |
 
-### Step B — Enable APIs
+**Converting the JSON file to base64 (required for Secrets only):**
 
-1. In the left menu, click **APIs & Services > Library**
-2. Search for `Google Sheets API` → click it → click **Enable**
-3. Go back to Library
-4. Search for `Google Drive API` → click it → click **Enable**
+- **Mac/Linux:** Open Terminal → `base64 -i ~/Downloads/your-key.json`
+- **Windows:** Open PowerShell → `[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\your-key.json"))`
+- **Online:** Go to https://www.base64encode.org → upload the file → copy the result
 
-### Step C — Create a Service Account
-
-1. In the left menu, click **APIs & Services > Credentials**
-2. Click **+ Create Credentials** → choose **Service Account**
-3. Name: `agent-zero-bot` → click **Create and Continue**
-4. Role: choose **Editor** → click **Continue** → click **Done**
-
-### Step D — Download the JSON Key
-
-1. On the Credentials page, click the service account you just created
-2. Click the **Keys** tab (at the top)
-3. Click **Add Key > Create new key**
-4. Choose **JSON** → click **Create**
-5. A file downloads to your computer (name like `agentZero-xxxxx.json`)
-
-### Step E — Convert the JSON to Base64
-
-You must convert the file to a one-line text string. Use any of these methods:
-
-**Method 1 — On Mac:**
-1. Open Terminal
-2. Type: `base64 -i ~/Downloads/agentZero-xxxxx.json` (use your actual filename)
-3. Press Enter
-4. A long text string appears — copy all of it
-
-**Method 2 — On Windows:**
-1. Open PowerShell
-2. Type: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Users\YourName\Downloads\agentZero-xxxxx.json"))`
-3. Press Enter — copy the output
-
-**Method 3 — Online tool (easiest):**
-1. Go to: **https://www.base64encode.org**
-2. Click **Choose File** → select your downloaded JSON file
-3. Click **Encode** → copy the result
-
-6. Save in Replit as `GOOGLE_SERVICE_ACCOUNT_JSON` — paste the long text as the value
-
-### Step F — Share the Spreadsheet with the Service Account
-
-1. Open the JSON file you downloaded (use Notepad or TextEdit)
-2. Find the line that says `"client_email":`
-3. Copy the email address (looks like: `agent-zero-bot@agentZero-xxxxx.iam.gserviceaccount.com`)
-4. Open your Google Sheet
-5. Click **Share** (top right)
-6. Paste the email → role: **Editor** → click **Send**
-
-Do the same for the Google Drive folder if you are using one.
-
----
-
-## Secret 7 — GOOGLE_SHEET_ID
-
-This is taken from the URL of your spreadsheet.
-
-**Steps:**
-1. Open your Google Sheet in Chrome
-2. Look at the URL in the address bar. It looks like:
-   ```
-   https://docs.google.com/spreadsheets/d/1aBcDeFgHiJkLmNoPqRsTuVwXyZ/edit
-   ```
-3. The ID is the part between `/d/` and `/edit`
-   In this example: `1aBcDeFgHiJkLmNoPqRsTuVwXyZ`
-4. Copy that part
-5. Save in Replit as `GOOGLE_SHEET_ID`
-
----
-
-## Secret 8 — GOOGLE_DRIVE_FOLDER_ID
-
-Only needed if you want to watch a Drive folder for uploaded PDFs.
-
-**Steps:**
-1. Open the Google Drive folder in Chrome
-2. Look at the URL:
-   ```
-   https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoPqRsTuVwXyZ
-   ```
-3. The ID is the part after `/folders/`
-4. Copy it
-5. Save in Replit as `GOOGLE_DRIVE_FOLDER_ID`
-
----
-
-## Final Checklist
-
-Before going live, confirm all 8 secrets are saved in Replit:
-
-- [ ] `ADMIN_PASSWORD` — dashboard password (you chose it)
-- [ ] `WHATSAPP_VERIFY_TOKEN` — random word (you chose it)
-- [ ] `WHATSAPP_APP_SECRET` — from Meta App Settings > Basic
-- [ ] `WHATSAPP_ACCESS_TOKEN` — from Meta, permanent system user token
-- [ ] `WHATSAPP_PHONE_NUMBER_ID` — from Meta WhatsApp API Setup
-- [ ] `GOOGLE_SERVICE_ACCOUNT_JSON` — base64 of the downloaded JSON file
-- [ ] `GOOGLE_SHEET_ID` — from the Google Sheet URL
-- [ ] `GOOGLE_DRIVE_FOLDER_ID` — from the Google Drive folder URL (optional)
-
-After saving all secrets, click **Restart** on the API Server workflow in Replit.  
-The app will read the new values and start working.
+After saving all secrets, restart the API Server workflow in Replit.
 
 ---
 
 ## Common Problems
 
-**"The webhook verification failed"**  
-→ Make sure the `WHATSAPP_VERIFY_TOKEN` in Replit exactly matches what you typed in Meta. No spaces, same uppercase/lowercase.
+**"Sheet not found" or "Access denied" in Step 2**
+→ You forgot to share the sheet with the service account email. Go to the sheet → Share → paste the email → Editor → Send.
 
-**"The Google Sheet is not updating"**  
-→ Check that you shared the sheet with the service account email (Step F above).
+**"Token is invalid" in Step 4**
+→ The access token expired (24-hour limit) or was copied incorrectly. Generate a permanent System User token (see Step 4 instructions above).
 
-**"Dashboard says 401 Unauthorized"**  
-→ The password you typed is wrong. Clear the browser cache and try again with the exact `ADMIN_PASSWORD` you saved.
+**"Webhook verification failed" in Meta**
+→ The Verify Token you typed in Meta does not match what you entered in the wizard. Open Settings in the dashboard and check Step 4.
 
-**"Access token expired"**  
-→ You used the 24-hour temporary token. Follow the System User steps above to get a permanent one.
+**Dashboard shows 401 Unauthorized after finishing setup**
+→ Your browser has the old password cached. Clear the site data in your browser and log in again.

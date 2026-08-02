@@ -3,46 +3,17 @@
  *
  * GET /admin/status — full system status snapshot
  *
- * Protected by HTTP Basic auth. Set ADMIN_PASSWORD to a shared password.
- * If ADMIN_PASSWORD is not set, the endpoint is open (dev convenience).
+ * Protected by HTTP Basic auth. ADMIN_PASSWORD is read from the config store
+ * (env var or data/config.json). If not set, the endpoint is open (dev/setup).
  */
 
 import { Router, type IRouter, type Request, type Response } from "express";
 import { peekResults } from "../lib/extractionStore.js";
 import { getDrivePollerStatus } from "../lib/drivePoller.js";
 import { getSchedulerStatus } from "../lib/scheduler.js";
+import { requireAdminAuth } from "../lib/adminAuth.js";
 
 const router: IRouter = Router();
-
-// ─── Basic-auth middleware ────────────────────────────────────────────────────
-
-function requireAdminAuth(req: Request, res: Response, next: () => void): void {
-  const password = process.env.ADMIN_PASSWORD;
-  if (!password) {
-    // No password set — open in dev
-    next();
-    return;
-  }
-
-  const auth = req.headers.authorization ?? "";
-  if (!auth.startsWith("Basic ")) {
-    res.setHeader("WWW-Authenticate", 'Basic realm="Trial Dashboard"');
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
-  const credentials = Buffer.from(auth.slice(6), "base64").toString("utf8");
-  const colonIdx = credentials.indexOf(":");
-  const suppliedPassword = colonIdx >= 0 ? credentials.slice(colonIdx + 1) : credentials;
-
-  if (suppliedPassword !== password) {
-    res.setHeader("WWW-Authenticate", 'Basic realm="Trial Dashboard"');
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
-  next();
-}
 
 // ─── GET /admin/status ────────────────────────────────────────────────────────
 

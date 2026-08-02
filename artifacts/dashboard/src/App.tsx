@@ -1,18 +1,58 @@
 import { useState, useEffect, useCallback } from 'react';
-import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, QueryCache, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
-import { setAuthTokenGetter } from '@workspace/api-client-react';
+import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
+import { setAuthTokenGetter, useGetSetupStatus, getGetSetupStatusQueryKey } from '@workspace/api-client-react';
+import { Loader2 } from 'lucide-react';
 
 import { Dashboard } from './pages/Dashboard';
 import { AuthGate } from './components/AuthGate';
+import { SetupWizard } from './pages/SetupWizard';
 import NotFound from '@/pages/not-found';
 
-function Router() {
+function SetupGuard({ password, handleAuth }: { password: string | null, handleAuth: (p: string) => void }) {
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  const { data: setupStatus, isLoading } = useGetSetupStatus();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // If setup isn't complete, force showing wizard regardless of route
+  if (setupStatus && !setupStatus.allRequired) {
+    return (
+      <SetupWizard 
+        onComplete={() => {
+          queryClient.invalidateQueries({ queryKey: getGetSetupStatusQueryKey() });
+          setLocation('/');
+        }} 
+      />
+    );
+  }
+
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
+      <Route path="/setup">
+        <SetupWizard 
+          onComplete={() => {
+            queryClient.invalidateQueries({ queryKey: getGetSetupStatusQueryKey() });
+            setLocation('/');
+          }} 
+        />
+      </Route>
+      <Route path="/">
+        {!password && setupStatus?.adminPassword ? (
+          <AuthGate onAuthenticated={handleAuth} />
+        ) : (
+          <Dashboard />
+        )}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -59,15 +99,11 @@ export default function App() {
     }
   }));
 
-  if (!password) {
-    return <AuthGate onAuthenticated={handleAuth} />;
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
+          <SetupGuard password={password} handleAuth={handleAuth} />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

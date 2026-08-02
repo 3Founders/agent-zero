@@ -5,6 +5,16 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface SetupStatus {
+  googleCredentials: boolean;
+  googleSheet: boolean;
+  googleDriveFolder: boolean;
+  whatsapp: boolean;
+  adminPassword: boolean;
+  /** True when every required integration is configured */
+  allRequired: boolean;
+}
+
 export interface HealthStatus {
   status: string;
 }

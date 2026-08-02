@@ -18,6 +18,20 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Returns which integrations are configured. No auth required — needed before the admin password is set during initial wizard flow.
+ * @summary Get setup wizard status
+ */
+export const GetSetupStatusResponse = zod.object({
+  "googleCredentials": zod.boolean(),
+  "googleSheet": zod.boolean(),
+  "googleDriveFolder": zod.boolean(),
+  "whatsapp": zod.boolean(),
+  "adminPassword": zod.boolean(),
+  "allRequired": zod.boolean().describe('True when every required integration is configured')
+})
+
+
+/**
  * Returns all extraction results (from WhatsApp and Drive), Drive poller health, and scheduler state. Protected by ADMIN_PASSWORD basic auth.
  * @summary Full system status snapshot
  */

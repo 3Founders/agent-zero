@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: admin
     description: Trial coordinator admin endpoints
+  - name: setup
+    description: In-app setup wizard endpoints
 paths:
   /healthz:
     get:
@@ -26,6 +28,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /admin/setup/status:
+    get:
+      operationId: getSetupStatus
+      tags: [setup]
+      summary: Get setup wizard status
+      description: >
+        Returns which integrations are configured. No auth required — needed
+        before the admin password is set during initial wizard flow.
+      responses:
+        "200":
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatus"
 
   /admin/status:
     get:
@@ -47,6 +65,24 @@ paths:
 
 components:
   schemas:
+    SetupStatus:
+      type: object
+      required: [googleCredentials, googleSheet, googleDriveFolder, whatsapp, adminPassword, allRequired]
+      properties:
+        googleCredentials:
+          type: boolean
+        googleSheet:
+          type: boolean
+        googleDriveFolder:
+          type: boolean
+        whatsapp:
+          type: boolean
+        adminPassword:
+          type: boolean
+        allRequired:
+          type: boolean
+          description: True when every required integration is configured
+
     HealthStatus:
       type: object
       properties:

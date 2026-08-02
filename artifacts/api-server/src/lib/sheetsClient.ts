@@ -1,9 +1,9 @@
 /**
  * Authenticated Google API client factory using a service-account credential.
  *
- * Required env vars:
- *   GOOGLE_SERVICE_ACCOUNT_JSON  — base64-encoded service-account JSON key file
- *   GOOGLE_SHEET_ID              — target spreadsheet ID
+ * Credential sources (highest priority first):
+ *   1. GOOGLE_SERVICE_ACCOUNT_JSON env var (Replit Secrets)
+ *   2. data/config.json written by the in-app setup wizard
  *
  * Scopes:
  *   - spreadsheets (read + write) — for Sheets upsert
@@ -12,15 +12,16 @@
 
 import { google } from "googleapis";
 import { logger } from "./logger.js";
+import { getConfigValue } from "./configStore.js";
 
 // ─── Credential helpers ───────────────────────────────────────────────────────
 
-function getServiceAccountJson(): object {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+export function getServiceAccountJson(): object {
+  const raw = getConfigValue("GOOGLE_SERVICE_ACCOUNT_JSON");
   if (!raw) {
     throw new Error(
       "GOOGLE_SERVICE_ACCOUNT_JSON is not set. " +
-        "Provide the base64-encoded service-account JSON key.",
+        "Use the setup wizard or provide the base64-encoded service-account JSON key.",
     );
   }
   try {
@@ -33,7 +34,7 @@ function getServiceAccountJson(): object {
 }
 
 export function getSheetId(): string {
-  const id = process.env.GOOGLE_SHEET_ID;
+  const id = getConfigValue("GOOGLE_SHEET_ID");
   if (!id) throw new Error("GOOGLE_SHEET_ID is not set");
   return id;
 }
@@ -75,4 +76,18 @@ export function getDriveClient(): ReturnType<typeof google.drive> {
   _drive = google.drive({ version: "v3", auth: getAuth() });
   logger.info("Google Drive client initialised");
   return _drive;
+}
+
+// ─── Hot-reload ───────────────────────────────────────────────────────────────
+
+/**
+ * Clear all cached Google API clients so they are recreated on next access
+ * with whatever credentials are now in the config store. Called by the
+ * setup wizard after saving new Google credentials.
+ */
+export function resetGoogleClients(): void {
+  _auth = null;
+  _sheets = null;
+  _drive = null;
+  logger.info("Google API clients reset — will reinitialise on next use");
 }
