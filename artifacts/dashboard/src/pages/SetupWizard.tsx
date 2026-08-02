@@ -546,9 +546,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               </CardContent>
               <CardFooter className="justify-between border-t border-border pt-4 pb-4">
                 <Button variant="ghost" onClick={() => setStep(3)}>Back</Button>
-                <Button onClick={handleNextStep4} disabled={!accessToken || !phoneNumberId || !verifyToken || !appSecret}>
-                  Next
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setStep(5)}>Skip</Button>
+                  <Button onClick={handleNextStep4} disabled={!accessToken || !phoneNumberId || !verifyToken || !appSecret}>
+                    Next
+                  </Button>
+                </div>
               </CardFooter>
             </>
           )}

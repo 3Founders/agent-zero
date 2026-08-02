@@ -78,7 +78,7 @@ export interface SetupStatus {
   googleDriveFolder: boolean;
   whatsapp: boolean;
   adminPassword: boolean;
-  /** True when every required integration is configured (Google creds + sheet + WhatsApp). */
+  /** True when the minimum required setup is done (Google creds + sheet). WhatsApp is optional. */
   allRequired: boolean;
 }
 
@@ -99,6 +99,6 @@ export function getSetupStatus(): SetupStatus {
     googleDriveFolder,
     whatsapp,
     adminPassword,
-    allRequired: googleCredentials && googleSheet && whatsapp,
+    allRequired: googleCredentials && googleSheet,
   };
 }
