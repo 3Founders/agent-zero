@@ -4,6 +4,9 @@
  * GET  /webhook/whatsapp  — Meta hub-challenge verification
  * POST /webhook/whatsapp  — Inbound message handler (async PDF pipeline)
  *
+ * Full pipeline per message:
+ *   download PDF → extract text → LLM extraction → upsert Sheets → WhatsApp reply
+ *
  * Security: POST requests are validated with X-Hub-Signature-256 before processing.
  */
 
@@ -13,13 +16,18 @@ import type { Logger } from "pino";
 import {
   downloadWhatsAppMedia,
   normalisePhone,
+  sendWhatsAppMessage,
 } from "../lib/whatsappClient.js";
 import { extractTextFromPdf } from "../lib/extractPdf.js";
 import { extractLabResultsFromText } from "../lib/extractLabResults.js";
+import { saveExtractionResult } from "../lib/extractionStore.js";
+import { upsertLabResults } from "../lib/sheetsSync.js";
+import { getSheetId } from "../lib/sheetsClient.js";
 import {
-  saveExtractionResult,
-  type ExtractionResult,
-} from "../lib/extractionStore.js";
+  composeSuccessReply,
+  composeErrorReply,
+  composeEmptyReply,
+} from "../lib/replyComposer.js";
 
 const router: IRouter = Router();
 
@@ -62,7 +70,6 @@ router.post(
     // Respond 200 immediately so Meta doesn't retry (pipeline runs async).
     res.status(200).json({ status: "ok" });
 
-    // 2. Extract messages from the payload
     const body = req.body as WhatsAppWebhookPayload;
     const entries = body?.entry ?? [];
     const log = req.log as Logger;
@@ -82,7 +89,6 @@ router.post(
             "Inbound WhatsApp message",
           );
 
-          // Only handle document (PDF) messages
           if (message.type !== "document") {
             log.info({ type: message.type }, "Ignoring non-document message");
             continue;
@@ -137,7 +143,7 @@ async function processPdf({
   receivedAt,
   log,
 }: ProcessPdfArgs): Promise<void> {
-  // Step 1 — download PDF from WhatsApp
+  // ── Step 1: download PDF ────────────────────────────────────────────────
   let pdfBuffer: Buffer;
   try {
     pdfBuffer = await downloadWhatsAppMedia(mediaId);
@@ -152,10 +158,15 @@ async function processPdf({
       reason: `PDF download failed: ${String(err)}`,
       source: "whatsapp",
     });
+    await trySendReply(
+      participantId,
+      composeErrorReply("Could not download your PDF"),
+      log,
+    );
     return;
   }
 
-  // Step 2 — extract text (pdf-parse + OCR fallback)
+  // ── Step 2: extract text ────────────────────────────────────────────────
   let rawText: string;
   try {
     rawText = await extractTextFromPdf(pdfBuffer);
@@ -170,28 +181,33 @@ async function processPdf({
       reason: `Text extraction failed: ${String(err)}`,
       source: "whatsapp",
     });
+    await trySendReply(
+      participantId,
+      composeErrorReply("Could not read text from your PDF"),
+      log,
+    );
     return;
   }
 
-  // Step 3 — LLM structured extraction
+  // ── Step 3: LLM structured extraction ──────────────────────────────────
   const llmResult = await extractLabResultsFromText(rawText);
 
   if ("kind" in llmResult) {
+    // Extraction error
     log.warn({ messageId, reason: llmResult.reason }, "LLM extraction failed");
-    const result: ExtractionResult = {
+    saveExtractionResult({
       status: "error",
       participantId,
       messageId,
       timestamp: new Date().toISOString(),
       reason: llmResult.reason,
       source: "whatsapp",
-    };
-    saveExtractionResult(result);
+    });
+    await trySendReply(participantId, composeErrorReply(), log);
     return;
   }
 
-  log.info({ messageId, rows: llmResult.length }, "Lab results extracted");
-
+  // Save to in-memory store (used by Task 3 Drive watcher for monitoring)
   saveExtractionResult({
     status: "success",
     participantId,
@@ -200,6 +216,63 @@ async function processPdf({
     rows: llmResult,
     source: "whatsapp",
   });
+
+  log.info({ messageId, rows: llmResult.length }, "Lab results extracted");
+
+  // ── Step 4: upsert into Google Sheets ──────────────────────────────────
+  let sheetWriteOk = false;
+  try {
+    if (llmResult.length > 0) {
+      await upsertLabResults(participantId, llmResult, messageId, "whatsapp");
+      sheetWriteOk = true;
+      log.info({ messageId }, "Sheets upsert complete");
+    }
+  } catch (err) {
+    log.error({ err, messageId }, "Sheets upsert failed — will still reply");
+  }
+
+  // ── Step 5: WhatsApp reply ──────────────────────────────────────────────
+  let replyText: string;
+  try {
+    const sheetId = getSheetId();
+    if (llmResult.length === 0) {
+      replyText = composeEmptyReply(sheetId);
+    } else if (sheetWriteOk) {
+      replyText = composeSuccessReply(llmResult, sheetId);
+    } else {
+      // Extraction worked but sheet write failed — still tell them what was found
+      replyText =
+        composeSuccessReply(llmResult, sheetId) +
+        "\n\n⚠️ Note: there was a problem saving to the sheet. The study team has been notified.";
+    }
+  } catch {
+    // GOOGLE_SHEET_ID not set — give a partial reply without the link
+    const count = llmResult.length;
+    replyText =
+      count > 0
+        ? `✅ Extracted ${count} markers from your report.`
+        : composeErrorReply();
+  }
+
+  await trySendReply(participantId, replyText, log);
+}
+
+// ─── Reply helper ─────────────────────────────────────────────────────────────
+
+/**
+ * Send a WhatsApp reply, eating errors so they never suppress the main pipeline.
+ */
+async function trySendReply(
+  to: string,
+  text: string,
+  log: Logger,
+): Promise<void> {
+  try {
+    await sendWhatsAppMessage(to, text);
+    log.info({ to }, "WhatsApp reply sent");
+  } catch (err) {
+    log.error({ err, to }, "WhatsApp reply failed");
+  }
 }
 
 // ─── Signature verification ──────────────────────────────────────────────────
@@ -209,7 +282,6 @@ type RequestWithRawBody = Request & { rawBody?: Buffer };
 function verifySignature(req: RequestWithRawBody): boolean {
   const appSecret = process.env.WHATSAPP_APP_SECRET;
   if (!appSecret) {
-    // Dev mode: skip verification if no secret is configured.
     req.log.warn("WHATSAPP_APP_SECRET not set — skipping signature check");
     return true;
   }

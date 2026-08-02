@@ -1,5 +1,6 @@
-import app from "./app";
-import { logger } from "./lib/logger";
+import app from "./app.js";
+import { logger } from "./lib/logger.js";
+import { ensureHeaderRow } from "./lib/sheetsSync.js";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,16 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Initialise Google Sheet header row in the background.
+  // Skips gracefully if credentials are not yet configured.
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_SHEET_ID) {
+    ensureHeaderRow().catch((initErr: unknown) => {
+      logger.warn({ err: initErr }, "Could not initialise Sheet header row");
+    });
+  } else {
+    logger.info(
+      "GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SHEET_ID not set — skipping Sheet init",
+    );
+  }
 });
