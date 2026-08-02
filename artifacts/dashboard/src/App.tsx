@@ -33,8 +33,11 @@ function SetupGuard({ authHeader, onAuth, onLogout }: SetupGuardProps) {
   if (setupStatus && !setupStatus.allRequired) {
     return (
       <SetupWizard
-        onComplete={() => {
-          queryClient.invalidateQueries({ queryKey: getGetSetupStatusQueryKey() });
+        onComplete={async () => {
+          await queryClient.invalidateQueries({
+            queryKey: getGetSetupStatusQueryKey(),
+            refetchType: 'all',
+          });
           setLocation('/');
         }}
       />
@@ -45,8 +48,11 @@ function SetupGuard({ authHeader, onAuth, onLogout }: SetupGuardProps) {
     <Switch>
       <Route path="/setup">
         <SetupWizard
-          onComplete={() => {
-            queryClient.invalidateQueries({ queryKey: getGetSetupStatusQueryKey() });
+          onComplete={async () => {
+            await queryClient.invalidateQueries({
+              queryKey: getGetSetupStatusQueryKey(),
+              refetchType: 'all',
+            });
             setLocation('/');
           }}
         />
