@@ -1,0 +1,9 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "-FpvJF85cd3-H4TslPJRy"
+uri = "file://docs/setup-secrets-guide.md"
+type = "text"
+title = "Agent 0 — Setup Secrets Guide"
+description = "Step-by-step guide to generate all 8 required secrets: WhatsApp (Meta Developer Portal), Google Sheets service account, Sheet ID, Drive folder ID, and admin password. Written in plain English for non-technical users."
