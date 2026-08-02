@@ -12,4 +12,5 @@ export type ExtractionErrorSource = typeof ExtractionErrorSource[keyof typeof Ex
 export const ExtractionErrorSource = {
   whatsapp: 'whatsapp',
   drive: 'drive',
+  manual: 'manual',
 } as const;

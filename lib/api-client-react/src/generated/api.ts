@@ -6,11 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
@@ -18,13 +22,17 @@ import type {
 import type {
   AdminExtractionsResponse,
   AdminStatus,
+  DrivePollerIntervalInput,
+  DrivePollerIntervalResult,
   ErrorResponse,
   HealthStatus,
-  SetupStatus
+  SetupStatus,
+  TestPdfInput,
+  TestPdfResult
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -361,4 +369,147 @@ export function useGetAdminStatus<TData = Awaited<ReturnType<typeof getAdminStat
 
 
 
+
+export const getProcessTestPdfUrl = () => {
+
+
+
+
+  return `/api/admin/test-upload`
+}
+
+/**
+ * Processes a PDF through the normal extraction and Google Sheets sync path. Protected by HTTP Basic Auth.
+ * @summary Process a coordinator test PDF
+ */
+export const processTestPdf = async (testPdfInput: TestPdfInput, options?: Parameters<typeof customFetch>[1]): Promise<TestPdfResult> => {
+
+  return customFetch<TestPdfResult>(getProcessTestPdfUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(testPdfInput)
+  }
+);}
+
+
+
+
+
+export const getProcessTestPdfMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof processTestPdf>>, TError,{data: BodyType<TestPdfInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof processTestPdf>>, TError,{data: BodyType<TestPdfInput>}, TContext> => {
+
+const mutationKey = ['processTestPdf'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof processTestPdf>>, {data: BodyType<TestPdfInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  processTestPdf(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ProcessTestPdfMutationResult = NonNullable<Awaited<ReturnType<typeof processTestPdf>>>
+    export type ProcessTestPdfMutationBody = BodyType<TestPdfInput>
+    export type ProcessTestPdfMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Process a coordinator test PDF
+ */
+export const useProcessTestPdf = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof processTestPdf>>, TError,{data: BodyType<TestPdfInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof processTestPdf>>,
+        TError,
+        {data: BodyType<TestPdfInput>},
+        TContext
+      > => {
+      return useMutation(getProcessTestPdfMutationOptions(options));
+    }
+
+export const getUpdateDrivePollerIntervalUrl = () => {
+
+
+
+
+  return `/api/admin/drive-poller/interval`
+}
+
+/**
+ * @summary Set automatic Drive scan frequency
+ */
+export const updateDrivePollerInterval = async (drivePollerIntervalInput: DrivePollerIntervalInput, options?: Parameters<typeof customFetch>[1]): Promise<DrivePollerIntervalResult> => {
+
+  return customFetch<DrivePollerIntervalResult>(getUpdateDrivePollerIntervalUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(drivePollerIntervalInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateDrivePollerIntervalMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDrivePollerInterval>>, TError,{data: BodyType<DrivePollerIntervalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDrivePollerInterval>>, TError,{data: BodyType<DrivePollerIntervalInput>}, TContext> => {
+
+const mutationKey = ['updateDrivePollerInterval'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDrivePollerInterval>>, {data: BodyType<DrivePollerIntervalInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateDrivePollerInterval(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDrivePollerIntervalMutationResult = NonNullable<Awaited<ReturnType<typeof updateDrivePollerInterval>>>
+    export type UpdateDrivePollerIntervalMutationBody = BodyType<DrivePollerIntervalInput>
+    export type UpdateDrivePollerIntervalMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Set automatic Drive scan frequency
+ */
+export const useUpdateDrivePollerInterval = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDrivePollerInterval>>, TError,{data: BodyType<DrivePollerIntervalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDrivePollerInterval>>,
+        TError,
+        {data: BodyType<DrivePollerIntervalInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateDrivePollerIntervalMutationOptions(options));
+    }
 

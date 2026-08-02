@@ -32,6 +32,9 @@ app.use(cors());
 // the X-Hub-Signature-256 HMAC signature from Meta / WhatsApp Cloud API.
 app.use(
   express.json({
+    // Test PDF uploads are sent as base64 JSON. Keep a firm limit so the
+    // coordinator dashboard cannot exhaust server memory with a huge file.
+    limit: "15mb",
     verify: (req: Request & { rawBody?: Buffer }, _res: Response, buf: Buffer) => {
       req.rawBody = buf;
     },

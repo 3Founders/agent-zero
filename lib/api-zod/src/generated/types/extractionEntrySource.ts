@@ -12,4 +12,5 @@ export type ExtractionEntrySource = typeof ExtractionEntrySource[keyof typeof Ex
 export const ExtractionEntrySource = {
   whatsapp: 'whatsapp',
   drive: 'drive',
+  manual: 'manual',
 } as const;

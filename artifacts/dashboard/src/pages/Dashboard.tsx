@@ -1,10 +1,34 @@
-import { useGetAdminStatus, getGetAdminStatusQueryKey } from '@workspace/api-client-react';
+import { useState } from 'react';
+import {
+  useGetAdminStatus,
+  getGetAdminStatusQueryKey,
+  useProcessTestPdf,
+  useUpdateDrivePollerInterval,
+  type TestPdfResult,
+} from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, HardDrive, Clock, AlertCircle, CheckCircle2, Settings, LogOut } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { RefreshCw, HardDrive, Clock, AlertCircle, CheckCircle2, Settings, LogOut, Upload, FileText, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Link } from 'wouter';
 
@@ -13,8 +37,26 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
+const DRIVE_INTERVAL_OPTIONS = [
+  { value: '900000', label: 'Every 15 minutes' },
+  { value: '3600000', label: 'Every hour' },
+  { value: '86400000', label: 'Once per day' },
+];
+
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  let binary = '';
+  for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 export function Dashboard({ authHeader, onLogout }: DashboardProps) {
   const queryClient = useQueryClient();
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [participantId, setParticipantId] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadResult, setUploadResult] = useState<TestPdfResult | null>(null);
   // Pass the Authorization header directly via the `request` option so
   // customFetch sees `Authorization: Basic <base64>` — not a Bearer-wrapped token.
   const { data, error, isLoading, isFetching } = useGetAdminStatus({
@@ -31,6 +73,64 @@ export function Dashboard({ authHeader, onLogout }: DashboardProps) {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: getGetAdminStatusQueryKey() });
+  };
+  const uploadMutation = useProcessTestPdf({
+    request: { headers: { Authorization: authHeader } },
+    mutation: {
+      onSuccess: (result) => {
+        setUploadResult(result);
+        setUploadError('');
+        queryClient.invalidateQueries({ queryKey: getGetAdminStatusQueryKey() });
+      },
+      onError: (error: any) => {
+        setUploadError(error?.data?.error || error?.message || 'The test PDF could not be processed.');
+      },
+    },
+  });
+  const intervalMutation = useUpdateDrivePollerInterval({
+    request: { headers: { Authorization: authHeader } },
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetAdminStatusQueryKey() }),
+    },
+  });
+
+  const openTestUpload = () => {
+    setParticipantId('');
+    setSelectedFile(null);
+    setUploadError('');
+    setUploadResult(null);
+    setUploadOpen(true);
+  };
+
+  const intervalError = intervalMutation.error
+    ? ((intervalMutation.error as any)?.data?.error || 'Could not update the automatic scan frequency.')
+    : '';
+
+  const submitTestUpload = async () => {
+    if (!participantId.trim()) {
+      setUploadError('Enter the participant phone number or ID.');
+      return;
+    }
+    if (!selectedFile) {
+      setUploadError('Choose a PDF file.');
+      return;
+    }
+    if (selectedFile.type !== 'application/pdf' && !selectedFile.name.toLowerCase().endsWith('.pdf')) {
+      setUploadError('Choose a PDF file.');
+      return;
+    }
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setUploadError('Choose a PDF smaller than 10 MB.');
+      return;
+    }
+    setUploadError('');
+    uploadMutation.mutate({
+      data: {
+        participantId: participantId.trim(),
+        filename: selectedFile.name,
+        pdfBase64: await fileToBase64(selectedFile),
+      },
+    });
   };
 
   if (isLoading && !data) {
@@ -91,6 +191,10 @@ export function Dashboard({ authHeader, onLogout }: DashboardProps) {
                 Settings
               </Button>
             </Link>
+            <Button onClick={openTestUpload} size="sm" className="gap-2">
+              <Upload className="w-4 h-4" />
+              Upload test PDF
+            </Button>
             <Button
               onClick={handleRefresh}
               variant="outline"
@@ -137,6 +241,33 @@ export function Dashboard({ authHeader, onLogout }: DashboardProps) {
                   <dd className="font-mono text-sm mt-1">
                     {drivePoller.lastPollTime ? format(parseISO(drivePoller.lastPollTime), "HH:mm:ss") : 'Never'}
                   </dd>
+                </div>
+                <div className="col-span-2 pt-2 border-t border-border/50">
+                  <dt className="text-muted-foreground mb-2">Automatic scan frequency</dt>
+                  <Select
+                    value={String(drivePoller.intervalMs)}
+                    onValueChange={(value) => intervalMutation.mutate({
+                      data: {
+                        intervalMs: Number(value) as 900000 | 3600000 | 86400000,
+                      },
+                    })}
+                    disabled={intervalMutation.isPending || !drivePoller.folderId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a scan frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DRIVE_INTERVAL_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {drivePoller.folderId
+                      ? 'New PDFs in the configured Drive folder are processed automatically.'
+                      : 'Add a Google Drive folder in Settings to enable automatic scans.'}
+                  </p>
+                  {intervalError && <p className="text-xs text-destructive mt-2">{intervalError}</p>}
                 </div>
                 <div className="col-span-2 pt-2 border-t border-border/50">
                   <dt className="text-muted-foreground mb-2 flex items-center justify-between">
@@ -225,7 +356,9 @@ export function Dashboard({ authHeader, onLogout }: DashboardProps) {
                         {format(parseISO(ex.timestamp), "MMM d, HH:mm:ss")}
                       </TableCell>
                       <TableCell className="font-mono text-sm">{ex.participantId}</TableCell>
-                      <TableCell className="capitalize text-sm">{ex.source}</TableCell>
+                      <TableCell className="capitalize text-sm">
+                        {ex.source === 'manual' ? 'Test upload' : ex.source}
+                      </TableCell>
                       <TableCell className="font-mono text-sm">
                         {ex.rowCount !== null && ex.rowCount !== undefined ? ex.rowCount : '-'}
                       </TableCell>
@@ -252,6 +385,91 @@ export function Dashboard({ authHeader, onLogout }: DashboardProps) {
           </div>
         </div>
       </div>
+      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Upload and process a test PDF</DialogTitle>
+            <DialogDescription>
+              This runs the same extraction and Google Sheets sync used for participant reports.
+            </DialogDescription>
+          </DialogHeader>
+
+          {uploadResult ? (
+            <div className="space-y-4">
+              <div className="rounded-md border border-teal-500/30 bg-teal-500/10 p-3 text-sm text-teal-800 dark:text-teal-200">
+                <div className="flex items-center gap-2 font-medium">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {uploadResult.rowCount} lab value{uploadResult.rowCount === 1 ? '' : 's'} extracted and saved to Google Sheets.
+                </div>
+                <p className="mt-1 text-xs opacity-80">Participant: {uploadResult.participantId}</p>
+              </div>
+              {uploadResult.rows.length > 0 ? (
+                <div className="max-h-56 overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Test</TableHead><TableHead>Value</TableHead><TableHead>Range</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {uploadResult.rows.map((row, index) => (
+                        <TableRow key={`${row.field}-${index}`}>
+                          <TableCell className="text-sm">{row.field}</TableCell>
+                          <TableCell className="font-mono text-sm">{row.value ?? '—'} {row.unit ?? ''}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{row.referenceRange ?? '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No lab values were found in this PDF. Nothing was added to the sheet.</p>
+              )}
+              <DialogFooter>
+                <Button onClick={() => setUploadOpen(false)}>Done</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="participantId">Participant phone number or ID</Label>
+                <Input
+                  id="participantId"
+                  value={participantId}
+                  onChange={(event) => setParticipantId(event.target.value)}
+                  placeholder="+919876543210"
+                  disabled={uploadMutation.isPending}
+                />
+                <p className="text-xs text-muted-foreground">Use the same phone number or ID every time for this participant so their Sheet rows update correctly.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="testPdf">Blood report PDF</Label>
+                <Input
+                  id="testPdf"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+                  disabled={uploadMutation.isPending}
+                />
+                {selectedFile && (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground"><FileText className="w-4 h-4" />{selectedFile.name} ({Math.ceil(selectedFile.size / 1024)} KB)</p>
+                )}
+              </div>
+              {uploadError && (
+                <div className="flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />{uploadError}
+                </div>
+              )}
+              <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
+                <strong className="text-foreground">Automatic Drive matching:</strong> name files like <code className="font-mono">+919876543210_report.pdf</code> in Drive. The phone number becomes the participant ID.
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setUploadOpen(false)} disabled={uploadMutation.isPending}>Cancel</Button>
+                <Button onClick={submitTestUpload} disabled={uploadMutation.isPending} className="gap-2">
+                  {uploadMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {uploadMutation.isPending ? 'Processing PDF…' : 'Process and save'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

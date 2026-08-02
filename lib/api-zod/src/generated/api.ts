@@ -41,7 +41,7 @@ export const GetAdminExtractionsResponse = zod.object({
   "participantId": zod.string(),
   "messageId": zod.string(),
   "timestamp": zod.string(),
-  "source": zod.enum(['whatsapp', 'drive']),
+  "source": zod.enum(['whatsapp', 'drive', 'manual']),
   "rows": zod.array(zod.object({
   "field": zod.string(),
   "value": zod.string().nullable(),
@@ -53,7 +53,7 @@ export const GetAdminExtractionsResponse = zod.object({
   "participantId": zod.string(),
   "messageId": zod.string(),
   "timestamp": zod.string(),
-  "source": zod.enum(['whatsapp', 'drive']),
+  "source": zod.enum(['whatsapp', 'drive', 'manual']),
   "reason": zod.string()
 })])),
   "poller": zod.object({
@@ -77,7 +77,7 @@ export const GetAdminStatusResponse = zod.object({
   "messageId": zod.string(),
   "participantId": zod.string(),
   "timestamp": zod.string(),
-  "source": zod.enum(['whatsapp', 'drive']),
+  "source": zod.enum(['whatsapp', 'drive', 'manual']),
   "status": zod.enum(['success', 'error']),
   "rowCount": zod.number().nullish().describe('Number of lab-result rows extracted (null on error)'),
   "reason": zod.string().nullish().describe('Error reason (null on success)')
@@ -99,6 +99,55 @@ export const GetAdminStatusResponse = zod.object({
   "activeParticipantCount": zod.number()
 }),
   "serverTime": zod.string().describe('ISO timestamp from the server')
+})
+
+
+/**
+ * Processes a PDF through the normal extraction and Google Sheets sync path. Protected by HTTP Basic Auth.
+ * @summary Process a coordinator test PDF
+ */
+
+export const processTestPdfBodyFilenameMin = 5;
+
+
+
+export const ProcessTestPdfBody = zod.object({
+  "participantId": zod.string().min(1),
+  "filename": zod.string().min(processTestPdfBodyFilenameMin),
+  "pdfBase64": zod.string().describe('Base64 content of a PDF no larger than 10 MB.')
+})
+
+export const ProcessTestPdfResponse = zod.object({
+  "messageId": zod.string(),
+  "participantId": zod.string(),
+  "rowCount": zod.number(),
+  "rows": zod.array(zod.object({
+  "field": zod.string(),
+  "value": zod.string().nullable(),
+  "unit": zod.string().nullable(),
+  "referenceRange": zod.string().nullable()
+})),
+  "sheetsSynced": zod.boolean()
+})
+
+
+/**
+ * @summary Set automatic Drive scan frequency
+ */
+export const UpdateDrivePollerIntervalBody = zod.object({
+  "intervalMs": zod.union([zod.literal(900000),zod.literal(3600000),zod.literal(86400000)])
+})
+
+export const UpdateDrivePollerIntervalResponse = zod.object({
+  "drivePoller": zod.object({
+  "running": zod.boolean(),
+  "folderId": zod.string().nullish(),
+  "intervalMs": zod.number().optional(),
+  "lastPollTime": zod.string().nullish(),
+  "processedCount": zod.number(),
+  "pendingRetryCount": zod.number(),
+  "pendingRetryFiles": zod.array(zod.string())
+})
 })
 
 

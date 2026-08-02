@@ -12,4 +12,5 @@ export type ExtractionSuccessSource = typeof ExtractionSuccessSource[keyof typeo
 export const ExtractionSuccessSource = {
   whatsapp: 'whatsapp',
   drive: 'drive',
+  manual: 'manual',
 } as const;

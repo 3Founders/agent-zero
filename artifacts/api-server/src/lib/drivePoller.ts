@@ -351,6 +351,7 @@ let _pollerStarted = false;
  * Used by the setup wizard after saving a new Drive folder ID.
  */
 export function resetDrivePoller(): void {
+  _pollerGeneration++;
   _pollerStarted = false;
   _pollerStatus = {
     running: false,
@@ -370,7 +371,7 @@ export function resetDrivePoller(): void {
  * scheduled after the current one fully completes.
  */
 export async function startDrivePoller(
-  intervalMs = Number(process.env.DRIVE_POLL_INTERVAL_MS ?? 60_000),
+  intervalMs = getConfiguredPollIntervalMs(),
 ): Promise<void> {
   if (_pollerStarted) return;
   _pollerStarted = true;
@@ -389,6 +390,7 @@ export async function startDrivePoller(
   _pollerStatus.running = true;
   _pollerStatus.folderId = folderId;
   _pollerStatus.intervalMs = intervalMs;
+  const generation = _pollerGeneration;
 
   logger.info({ folderId, intervalMs }, "Drive poller started");
 
@@ -471,6 +473,7 @@ export async function startDrivePoller(
   // Recursive setTimeout: next tick only fires after current tick finishes.
   const scheduleNext = (): void => {
     setTimeout(() => {
+      if (generation !== _pollerGeneration) return;
       tick()
         .catch((err: unknown) =>
           logger.error({ err }, "Drive poll tick failed"),
@@ -488,6 +491,7 @@ export async function startDrivePoller(
 }
 
 let _lastRunTime: string | null = null;
+let _pollerGeneration = 0;
 
 let _filesFoundLastRun = 0;
 
@@ -495,11 +499,29 @@ let _filesSkippedLastRun = 0;
 
 export function getPollerState(): PollerState {
   return {
-    enabled: _pollerStarted && !!process.env.GOOGLE_DRIVE_FOLDER_ID,
+    enabled: _pollerStarted && !!getConfigValue("GOOGLE_DRIVE_FOLDER_ID"),
     lastRunTime: _lastRunTime,
     filesFoundLastRun: _filesFoundLastRun,
     filesSkippedLastRun: _filesSkippedLastRun,
     pendingRetryCount: pendingRetry.size,
     processedCount: processed.size,
   };
+}
+
+export const DRIVE_POLL_INTERVAL_OPTIONS = [15 * 60_000, 60 * 60_000, 24 * 60 * 60_000] as const;
+
+export function getConfiguredPollIntervalMs(): number {
+  const configured = Number(getConfigValue("DRIVE_POLL_INTERVAL_MS"));
+  return DRIVE_POLL_INTERVAL_OPTIONS.includes(configured as (typeof DRIVE_POLL_INTERVAL_OPTIONS)[number])
+    ? configured
+    : 15 * 60_000;
+}
+
+/** Apply a coordinator-selected scan interval without restarting the server. */
+export async function restartDrivePoller(intervalMs: number): Promise<void> {
+  if (!DRIVE_POLL_INTERVAL_OPTIONS.includes(intervalMs as (typeof DRIVE_POLL_INTERVAL_OPTIONS)[number])) {
+    throw new Error("Unsupported Drive scan interval");
+  }
+  resetDrivePoller();
+  await startDrivePoller(intervalMs);
 }

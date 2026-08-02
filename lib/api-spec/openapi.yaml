@@ -105,6 +105,69 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /admin/test-upload:
+    post:
+      operationId: processTestPdf
+      tags: [admin]
+      summary: Process a coordinator test PDF
+      description: >
+        Processes a PDF through the normal extraction and Google Sheets sync path.
+        Protected by HTTP Basic Auth.
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestPdfInput"
+      responses:
+        "200":
+          description: PDF processed and results synced to Google Sheets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestPdfResult"
+        "400":
+          description: Invalid upload input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: PDF could be interpreted as lab results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/drive-poller/interval:
+    put:
+      operationId: updateDrivePollerInterval
+      tags: [admin]
+      summary: Set automatic Drive scan frequency
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DrivePollerIntervalInput"
+      responses:
+        "200":
+          description: Drive watcher restarted with the selected interval
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DrivePollerIntervalResult"
+        "400":
+          description: Unsupported interval
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     basicAuth:
@@ -145,6 +208,52 @@ components:
       required:
         - error
 
+    TestPdfInput:
+      type: object
+      required: [participantId, filename, pdfBase64]
+      properties:
+        participantId:
+          type: string
+          minLength: 1
+        filename:
+          type: string
+          minLength: 5
+        pdfBase64:
+          type: string
+          description: Base64 content of a PDF no larger than 10 MB.
+
+    TestPdfResult:
+      type: object
+      required: [messageId, participantId, rowCount, rows, sheetsSynced]
+      properties:
+        messageId:
+          type: string
+        participantId:
+          type: string
+        rowCount:
+          type: number
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabResultRow"
+        sheetsSynced:
+          type: boolean
+
+    DrivePollerIntervalInput:
+      type: object
+      required: [intervalMs]
+      properties:
+        intervalMs:
+          type: number
+          enum: [900000, 3600000, 86400000]
+
+    DrivePollerIntervalResult:
+      type: object
+      required: [drivePoller]
+      properties:
+        drivePoller:
+          $ref: "#/components/schemas/DrivePollerStatus"
+
     # ── /admin/extractions schemas ────────────────────────────────────────────
 
     LabResultRow:
@@ -178,7 +287,7 @@ components:
           type: string
         source:
           type: string
-          enum: [whatsapp, drive]
+          enum: [whatsapp, drive, manual]
         rows:
           type: array
           items:
@@ -205,7 +314,7 @@ components:
           type: string
         source:
           type: string
-          enum: [whatsapp, drive]
+          enum: [whatsapp, drive, manual]
         reason:
           type: string
       required:
@@ -274,7 +383,7 @@ components:
           type: string
         source:
           type: string
-          enum: [whatsapp, drive]
+          enum: [whatsapp, drive, manual]
         status:
           type: string
           enum: [success, error]

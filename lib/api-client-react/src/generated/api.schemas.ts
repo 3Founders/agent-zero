@@ -23,6 +23,15 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface TestPdfInput {
+  /** @minLength 1 */
+  participantId: string;
+  /** @minLength 5 */
+  filename: string;
+  /** Base64 content of a PDF no larger than 10 MB. */
+  pdfBase64: string;
+}
+
 export interface LabResultRow {
   field: string;
   /** @nullable */
@@ -31,6 +40,43 @@ export interface LabResultRow {
   unit: string | null;
   /** @nullable */
   referenceRange: string | null;
+}
+
+export interface TestPdfResult {
+  messageId: string;
+  participantId: string;
+  rowCount: number;
+  rows: LabResultRow[];
+  sheetsSynced: boolean;
+}
+
+export type DrivePollerIntervalInputIntervalMs = typeof DrivePollerIntervalInputIntervalMs[keyof typeof DrivePollerIntervalInputIntervalMs];
+
+
+export const DrivePollerIntervalInputIntervalMs = {
+  NUMBER_900000: 900000,
+  NUMBER_3600000: 3600000,
+  NUMBER_86400000: 86400000,
+} as const;
+
+export interface DrivePollerIntervalInput {
+  intervalMs: DrivePollerIntervalInputIntervalMs;
+}
+
+export interface DrivePollerStatus {
+  running: boolean;
+  /** @nullable */
+  folderId?: string | null;
+  intervalMs?: number;
+  /** @nullable */
+  lastPollTime?: string | null;
+  processedCount: number;
+  pendingRetryCount: number;
+  pendingRetryFiles: string[];
+}
+
+export interface DrivePollerIntervalResult {
+  drivePoller: DrivePollerStatus;
 }
 
 export type ExtractionSuccessStatus = typeof ExtractionSuccessStatus[keyof typeof ExtractionSuccessStatus];
@@ -46,6 +92,7 @@ export type ExtractionSuccessSource = typeof ExtractionSuccessSource[keyof typeo
 export const ExtractionSuccessSource = {
   whatsapp: 'whatsapp',
   drive: 'drive',
+  manual: 'manual',
 } as const;
 
 export interface ExtractionSuccess {
@@ -70,6 +117,7 @@ export type ExtractionErrorSource = typeof ExtractionErrorSource[keyof typeof Ex
 export const ExtractionErrorSource = {
   whatsapp: 'whatsapp',
   drive: 'drive',
+  manual: 'manual',
 } as const;
 
 export interface ExtractionError {
@@ -105,6 +153,7 @@ export type ExtractionEntrySource = typeof ExtractionEntrySource[keyof typeof Ex
 export const ExtractionEntrySource = {
   whatsapp: 'whatsapp',
   drive: 'drive',
+  manual: 'manual',
 } as const;
 
 export type ExtractionEntryStatus = typeof ExtractionEntryStatus[keyof typeof ExtractionEntryStatus];
@@ -131,18 +180,6 @@ export interface ExtractionEntry {
      * @nullable
      */
   reason?: string | null;
-}
-
-export interface DrivePollerStatus {
-  running: boolean;
-  /** @nullable */
-  folderId?: string | null;
-  intervalMs?: number;
-  /** @nullable */
-  lastPollTime?: string | null;
-  processedCount: number;
-  pendingRetryCount: number;
-  pendingRetryFiles: string[];
 }
 
 export interface SchedulerStatus {

@@ -24,7 +24,8 @@ export type ConfigKey =
   | "WHATSAPP_PHONE_NUMBER_ID"
   | "WHATSAPP_VERIFY_TOKEN"
   | "WHATSAPP_APP_SECRET"
-  | "ADMIN_PASSWORD";
+  | "ADMIN_PASSWORD"
+  | "DRIVE_POLL_INTERVAL_MS";
 
 const CONFIG_PATH = join(process.cwd(), "data", "config.json");
 

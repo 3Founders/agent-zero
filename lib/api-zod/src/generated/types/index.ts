@@ -8,6 +8,9 @@
 
 export * from './adminExtractionsResponse';
 export * from './adminStatus';
+export * from './drivePollerIntervalInput';
+export * from './drivePollerIntervalInputIntervalMs';
+export * from './drivePollerIntervalResult';
 export * from './drivePollerStatus';
 export * from './errorResponse';
 export * from './extractionEntry';
@@ -25,3 +28,5 @@ export * from './labResultRow';
 export * from './pollerState';
 export * from './schedulerStatus';
 export * from './setupStatus';
+export * from './testPdfInput';
+export * from './testPdfResult';

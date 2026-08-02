@@ -72,7 +72,7 @@ export async function upsertLabResults(
   participantId: string,
   rows: LabResultRow[],
   messageId: string,
-  source: "whatsapp" | "drive",
+  source: "whatsapp" | "drive" | "manual",
 ): Promise<void> {
   if (rows.length === 0) return;
 
