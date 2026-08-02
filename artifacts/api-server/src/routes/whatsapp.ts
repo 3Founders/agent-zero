@@ -2,10 +2,16 @@
  * WhatsApp Cloud API webhook routes.
  *
  * GET  /webhook/whatsapp  — Meta hub-challenge verification
- * POST /webhook/whatsapp  — Inbound message handler (async PDF pipeline)
+ * POST /webhook/whatsapp  — Inbound message handler (async PDF pipeline + conversation flow)
  *
- * Full pipeline per message:
+ * Full pipeline per document message:
  *   download PDF → extract text → LLM extraction → upsert Sheets → WhatsApp reply
+ *
+ * Text message handling:
+ *   - Participants in an active questionnaire: advance questionnaire step
+ *   - "yes" / "no" / "skip": log dose response (if Google creds available)
+ *   - "start" / "register" / greeting: begin demographics questionnaire
+ *   - Other: send a help message
  *
  * Security: POST requests are validated with X-Hub-Signature-256 before processing.
  */
@@ -28,6 +34,20 @@ import {
   composeErrorReply,
   composeEmptyReply,
 } from "../lib/replyComposer.js";
+import {
+  isInQuestionnaire,
+  startQuestionnaire,
+  cancelQuestionnaire,
+  advanceQuestionnaire,
+  STEP_PROMPTS,
+  INTRO_MESSAGE,
+  COMPLETION_MESSAGE,
+} from "../lib/conversationState.js";
+import {
+  saveDemographics,
+  logDoseResponse,
+  type DoseResponse,
+} from "../lib/demographicsSheet.js";
 
 const router: IRouter = Router();
 
@@ -89,44 +109,190 @@ router.post(
             "Inbound WhatsApp message",
           );
 
-          if (message.type !== "document") {
-            log.info({ type: message.type }, "Ignoring non-document message");
-            continue;
+          if (message.type === "document") {
+            const mediaId = message.document?.id;
+            const mimeType = message.document?.mime_type ?? "";
+
+            if (!mediaId) {
+              log.warn({ messageId }, "Document message missing media id");
+              continue;
+            }
+
+            if (
+              !mimeType.includes("pdf") &&
+              !mimeType.includes("octet-stream")
+            ) {
+              log.info({ mimeType }, "Non-PDF document, skipping");
+              continue;
+            }
+
+            // Fire-and-forget — errors must not crash the process
+            processPdf({
+              mediaId,
+              participantId,
+              messageId,
+              receivedAt,
+              log,
+            }).catch((err: unknown) => {
+              log.error({ err, messageId }, "Unhandled error in PDF pipeline");
+            });
+          } else if (message.type === "text") {
+            const textBody = (message.text?.body ?? "").trim();
+
+            processTextMessage({
+              participantId,
+              messageId,
+              textBody,
+              log,
+            }).catch((err: unknown) => {
+              log.error(
+                { err, messageId },
+                "Unhandled error in text message handler",
+              );
+            });
+          } else {
+            log.info({ type: message.type }, "Ignoring unsupported message type");
           }
-
-          const mediaId = message.document?.id;
-          const mimeType = message.document?.mime_type ?? "";
-
-          if (!mediaId) {
-            log.warn({ messageId }, "Document message missing media id");
-            continue;
-          }
-
-          if (
-            !mimeType.includes("pdf") &&
-            !mimeType.includes("octet-stream")
-          ) {
-            log.info({ mimeType }, "Non-PDF document, skipping");
-            continue;
-          }
-
-          // Fire-and-forget — errors must not crash the process
-          processPdf({
-            mediaId,
-            participantId,
-            messageId,
-            receivedAt,
-            log,
-          }).catch((err: unknown) => {
-            log.error({ err, messageId }, "Unhandled error in PDF pipeline");
-          });
         }
       }
     }
   },
 );
 
-// ─── Core pipeline ───────────────────────────────────────────────────────────
+// ─── Text message handler ─────────────────────────────────────────────────────
+
+interface ProcessTextArgs {
+  participantId: string;
+  messageId: string;
+  textBody: string;
+  log: Logger;
+}
+
+const DOSE_RESPONSES = new Set(["yes", "no", "skip"]);
+const START_KEYWORDS = new Set(["start", "register", "hi", "hello", "hey"]);
+
+async function processTextMessage({
+  participantId,
+  textBody,
+  log,
+}: ProcessTextArgs): Promise<void> {
+  const normalised = textBody.toLowerCase().trim();
+
+  // ── Cancel in-progress questionnaire ───────────────────────────────────
+  if (normalised === "cancel") {
+    if (isInQuestionnaire(participantId)) {
+      cancelQuestionnaire(participantId);
+      await trySendReply(
+        participantId,
+        "❌ Questionnaire cancelled. Reply *start* whenever you're ready to try again.",
+        log,
+      );
+    } else {
+      await trySendReply(
+        participantId,
+        "There's nothing active to cancel. Reply *start* to begin the health questionnaire.",
+        log,
+      );
+    }
+    return;
+  }
+
+  // ── Active questionnaire: advance to next step ──────────────────────────
+  if (isInQuestionnaire(participantId)) {
+    const result = advanceQuestionnaire(participantId, textBody);
+
+    if (!result.done) {
+      await trySendReply(participantId, STEP_PROMPTS[result.nextStep], log);
+      return;
+    }
+
+    // Questionnaire complete — save to sheet if Google creds are available
+    const hasGoogleCreds =
+      !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON &&
+      !!process.env.GOOGLE_SHEET_ID;
+
+    if (hasGoogleCreds) {
+      try {
+        await saveDemographics(participantId, result.answers);
+        log.info({ participantId }, "Demographics saved to sheet");
+      } catch (err) {
+        log.error({ err, participantId }, "Failed to save demographics to sheet");
+        await trySendReply(
+          participantId,
+          COMPLETION_MESSAGE +
+            "\n\n⚠️ There was a problem saving your data. The study team has been notified.",
+          log,
+        );
+        return;
+      }
+    } else {
+      log.warn(
+        { participantId },
+        "Demographics collected but Google creds not set — not saved to sheet",
+      );
+    }
+
+    await trySendReply(participantId, COMPLETION_MESSAGE, log);
+    return;
+  }
+
+  // ── Dose reminder response ──────────────────────────────────────────────
+  if (DOSE_RESPONSES.has(normalised)) {
+    const response = normalised as DoseResponse;
+
+    // Determine time of day based on wall-clock hour in trial timezone
+    const tz = process.env.TRIAL_TIMEZONE ?? "Asia/Kolkata";
+    const hourStr = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour: "numeric",
+      hour12: false,
+    }).format(new Date());
+    const hour = Number(hourStr);
+    const timeOfDay = hour < 14 ? "morning" : "evening";
+
+    const hasGoogleCreds =
+      !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON &&
+      !!process.env.GOOGLE_SHEET_ID;
+
+    if (hasGoogleCreds) {
+      try {
+        await logDoseResponse(participantId, timeOfDay, response);
+      } catch (err) {
+        log.error({ err, participantId }, "Failed to log dose response");
+      }
+    }
+
+    const ack =
+      response === "yes"
+        ? "✅ Great, logged! Keep it up."
+        : response === "no"
+          ? "📝 Noted — no dose logged."
+          : "⏭️ Skipped and logged.";
+
+    await trySendReply(participantId, ack, log);
+    return;
+  }
+
+  // ── Start questionnaire ─────────────────────────────────────────────────
+  if (START_KEYWORDS.has(normalised)) {
+    startQuestionnaire(participantId);
+    await trySendReply(participantId, INTRO_MESSAGE, log);
+    return;
+  }
+
+  // ── Fallback help message ───────────────────────────────────────────────
+  await trySendReply(
+    participantId,
+    "👋 Hello! Here's what you can do:\n\n" +
+      "• Reply *start* to begin the health questionnaire\n" +
+      "• Reply *yes*, *no*, or *skip* after a dose reminder\n" +
+      "• Send your lab results as a PDF attachment\n\n" +
+      "Reply *cancel* at any time to stop an in-progress questionnaire.",
+    log,
+  );
+}
+
+// ─── PDF pipeline ─────────────────────────────────────────────────────────────
 
 interface ProcessPdfArgs {
   mediaId: string;
