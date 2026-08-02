@@ -34,6 +34,11 @@ function SetupGuard({ authHeader, onAuth, onLogout }: SetupGuardProps) {
     return (
       <SetupWizard
         onComplete={async () => {
+          // Wizard just saved the password to localStorage; sync it into
+          // React state so authHeader is set and the user goes straight to
+          // the dashboard instead of being prompted again at AuthGate.
+          const stored = localStorage.getItem('adminPassword');
+          if (stored) onAuth(stored);
           await queryClient.invalidateQueries({
             queryKey: getGetSetupStatusQueryKey(),
             refetchType: 'all',
@@ -49,6 +54,8 @@ function SetupGuard({ authHeader, onAuth, onLogout }: SetupGuardProps) {
       <Route path="/setup">
         <SetupWizard
           onComplete={async () => {
+            const stored = localStorage.getItem('adminPassword');
+            if (stored) onAuth(stored);
             await queryClient.invalidateQueries({
               queryKey: getGetSetupStatusQueryKey(),
               refetchType: 'all',
