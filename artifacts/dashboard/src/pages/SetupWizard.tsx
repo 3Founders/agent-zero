@@ -13,6 +13,36 @@ interface SetupWizardProps {
   onComplete?: () => void;
 }
 
+/** Styled external link used inside wizard steps. */
+function A({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary underline underline-offset-2 hover:opacity-80"
+    >
+      {children}
+    </a>
+  );
+}
+
+/** Numbered instruction list shown inside wizard steps. */
+function Steps({ items }: { items: React.ReactNode[] }) {
+  return (
+    <ol className="space-y-1.5 text-sm text-muted-foreground list-none">
+      {items.map((item, i) => (
+        <li key={i} className="flex gap-2">
+          <span className="shrink-0 w-5 h-5 rounded-full bg-muted text-foreground text-xs font-semibold flex items-center justify-center">
+            {i + 1}
+          </span>
+          <span className="leading-snug">{item}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 /** Build fetch headers including Basic auth if a password is already stored. */
 function setupHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const stored = localStorage.getItem('adminPassword');
@@ -249,6 +279,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <Steps items={[
+                  <><A href="https://console.cloud.google.com">Open Google Cloud Console</A> → sign in → click your project name at the top → <strong>New Project</strong> → name it anything → <strong>Create</strong></>,
+                  <><A href="https://console.cloud.google.com/apis/library/sheets.googleapis.com">Enable Google Sheets API</A> and <A href="https://console.cloud.google.com/apis/library/drive.googleapis.com">Google Drive API</A></>,
+                  <>Go to <A href="https://console.cloud.google.com/iam-admin/serviceaccounts">Service Accounts</A> → <strong>+ Create Service Account</strong> → any name → Role: <strong>Editor</strong> → <strong>Done</strong></>,
+                  <>Click the new service account → <strong>Keys</strong> tab → <strong>Add Key → Create new key → JSON</strong> → a file downloads to your computer</>,
+                  <>Click the box below and select that downloaded file</>,
+                ]} />
+
                 <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center relative hover:bg-muted/30 transition-colors text-center">
                   <UploadCloud className="w-8 h-8 text-muted-foreground mb-3" />
                   <p className="text-sm font-medium mb-1">Click to upload JSON key</p>
@@ -307,6 +345,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                   </div>
                 </div>
                 
+                <Steps items={[
+                  <><A href="https://sheets.new">Create a new Google Sheet</A> (or open an existing one)</>,
+                  <>Click <strong>Share</strong> (top-right of the sheet) → paste the service account email above → role: <strong>Editor</strong> → <strong>Send</strong></>,
+                  <>Copy the full URL from your browser and paste it below</>,
+                ]} />
+
                 <div className="space-y-2">
                   <Label htmlFor="sheetUrl">Spreadsheet URL</Label>
                   <Input 
@@ -371,6 +415,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <Steps items={[
+                  <><A href="https://drive.google.com">Open Google Drive</A> → find or create the folder where participants will upload PDFs</>,
+                  <>Right-click the folder → <strong>Share</strong> → paste the service account email from Step 1 → <strong>Editor</strong> → <strong>Send</strong></>,
+                  <>Open the folder → copy the full URL from your browser and paste it below</>,
+                ]} />
+
                 <div className="space-y-2">
                   <Label htmlFor="driveUrl">Google Drive Folder URL</Label>
                   <Input 
@@ -412,6 +462,20 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <Steps items={[
+                  <><A href="https://developers.facebook.com/apps">Open Meta Developer Portal</A> → sign in with Facebook → click your app (or <A href="https://developers.facebook.com/apps/creation">create a new one</A> → type: <strong>Business</strong>)</>,
+                  <>In your app, scroll to <strong>WhatsApp</strong> → <strong>Set up</strong> → go to <strong>API Setup</strong></>,
+                  <><strong>Access Token</strong>: copy the temporary token shown on the API Setup page (see note below for a permanent one)</>,
+                  <><strong>Phone Number ID</strong>: shown just above the token on the same page</>,
+                  <><strong>Verify Token</strong>: make up any word you'll remember — e.g. <code className="text-xs bg-muted px-1 rounded">guttrialbot2024</code></>,
+                  <><strong>App Secret</strong>: go to <A href="https://developers.facebook.com/apps">your app</A> → <strong>App Settings → Basic</strong> → click <strong>Show</strong> next to App secret</>,
+                ]} />
+
+                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 p-3 rounded-md text-xs leading-relaxed">
+                  <strong>Make your token permanent</strong> — the temporary token expires in 24 hours.{' '}
+                  <A href="https://business.facebook.com/settings/system-users">Open Business Settings → System Users</A> → Add → role: Admin → Add Assets → select your WhatsApp app → Generate New Token → tick <code className="bg-muted/50 px-1 rounded">whatsapp_business_messaging</code>. Paste that token above.
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="accessToken">Access Token</Label>
                   <Textarea 
