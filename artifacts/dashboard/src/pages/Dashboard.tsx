@@ -1,17 +1,24 @@
-import { useEffect } from 'react';
 import { useGetAdminStatus, getGetAdminStatusQueryKey } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCw, HardDrive, Clock, AlertCircle, CheckCircle2, Settings } from 'lucide-react';
+import { RefreshCw, HardDrive, Clock, AlertCircle, CheckCircle2, Settings, LogOut } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Link } from 'wouter';
 
-export function Dashboard() {
+interface DashboardProps {
+  authHeader: string;
+  onLogout: () => void;
+}
+
+export function Dashboard({ authHeader, onLogout }: DashboardProps) {
   const queryClient = useQueryClient();
+  // Pass the Authorization header directly via the `request` option so
+  // customFetch sees `Authorization: Basic <base64>` — not a Bearer-wrapped token.
   const { data, error, isLoading, isFetching } = useGetAdminStatus({
+    request: { headers: { Authorization: authHeader } },
     query: {
       queryKey: getGetAdminStatusQueryKey(),
       refetchInterval: 30_000,
@@ -84,15 +91,24 @@ export function Dashboard() {
                 Settings
               </Button>
             </Link>
-            <Button 
-              onClick={handleRefresh} 
-              variant="outline" 
+            <Button
+              onClick={handleRefresh}
+              variant="outline"
               size="sm"
               className="gap-2"
               disabled={isFetching}
             >
               <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button
+              onClick={onLogout}
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-destructive"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
             </Button>
           </div>
         </header>
@@ -214,7 +230,7 @@ export function Dashboard() {
                         {ex.rowCount !== null && ex.rowCount !== undefined ? ex.rowCount : '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge 
+                        <Badge
                           variant={ex.status === 'success' ? 'default' : 'destructive'}
                           className={ex.status === 'success' ? 'bg-teal-700/10 text-teal-800 hover:bg-teal-700/20 border-teal-700/20 shadow-none' : 'bg-destructive/10 text-destructive hover:bg-destructive/20 border-destructive/20 shadow-none'}
                         >

@@ -45,14 +45,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/SetupStatus"
 
+  /admin/extractions:
+    get:
+      operationId: getAdminExtractions
+      tags: [admin]
+      summary: List all extractions and poller state
+      description: >
+        Returns all in-memory extraction results and Drive poller state.
+        Protected by HTTP Basic Auth (ADMIN_PASSWORD env var).
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: Extractions and poller state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminExtractionsResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Admin endpoint not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /admin/status:
     get:
       operationId: getAdminStatus
       tags: [admin]
       summary: Full system status snapshot
       description: >
-        Returns all extraction results (from WhatsApp and Drive), Drive poller
-        health, and scheduler state. Protected by ADMIN_PASSWORD basic auth.
+        Returns all extraction results (flattened), Drive poller health, and
+        scheduler state. Protected by HTTP Basic Auth (ADMIN_PASSWORD env var).
+      security:
+        - basicAuth: []
       responses:
         "200":
           description: System status
@@ -62,8 +94,22 @@ paths:
                 $ref: "#/components/schemas/AdminStatus"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Admin endpoint not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
   schemas:
     SetupStatus:
       type: object
@@ -91,21 +137,130 @@ components:
       required:
         - status
 
-    AdminStatus:
+    ErrorResponse:
       type: object
-      required: [extractions, drivePoller, scheduler, serverTime]
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    # ── /admin/extractions schemas ────────────────────────────────────────────
+
+    LabResultRow:
+      type: object
+      properties:
+        field:
+          type: string
+        value:
+          type: ["string", "null"]
+        unit:
+          type: ["string", "null"]
+        referenceRange:
+          type: ["string", "null"]
+      required:
+        - field
+        - value
+        - unit
+        - referenceRange
+
+    ExtractionSuccess:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        participantId:
+          type: string
+        messageId:
+          type: string
+        timestamp:
+          type: string
+        source:
+          type: string
+          enum: [whatsapp, drive]
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabResultRow"
+      required:
+        - status
+        - participantId
+        - messageId
+        - timestamp
+        - source
+        - rows
+
+    ExtractionError:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [error]
+        participantId:
+          type: string
+        messageId:
+          type: string
+        timestamp:
+          type: string
+        source:
+          type: string
+          enum: [whatsapp, drive]
+        reason:
+          type: string
+      required:
+        - status
+        - participantId
+        - messageId
+        - timestamp
+        - source
+        - reason
+
+    ExtractionResult:
+      oneOf:
+        - $ref: "#/components/schemas/ExtractionSuccess"
+        - $ref: "#/components/schemas/ExtractionError"
+
+    PollerState:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        lastRunTime:
+          type: ["string", "null"]
+        filesFoundLastRun:
+          type: number
+        filesSkippedLastRun:
+          type: number
+        pendingRetryCount:
+          type: number
+        processedCount:
+          type: number
+      required:
+        - enabled
+        - lastRunTime
+        - filesFoundLastRun
+        - filesSkippedLastRun
+        - pendingRetryCount
+        - processedCount
+
+    AdminExtractionsResponse:
+      type: object
       properties:
         extractions:
           type: array
           items:
-            $ref: "#/components/schemas/ExtractionEntry"
-        drivePoller:
-          $ref: "#/components/schemas/DrivePollerStatus"
-        scheduler:
-          $ref: "#/components/schemas/SchedulerStatus"
-        serverTime:
+            $ref: "#/components/schemas/ExtractionResult"
+        poller:
+          $ref: "#/components/schemas/PollerState"
+        retrievedAt:
           type: string
-          description: ISO timestamp from the server
+      required:
+        - extractions
+        - poller
+        - retrievedAt
+
+    # ── /admin/status schemas ─────────────────────────────────────────────────
 
     ExtractionEntry:
       type: object
@@ -165,3 +320,19 @@ components:
           type: string
         activeParticipantCount:
           type: number
+
+    AdminStatus:
+      type: object
+      required: [extractions, drivePoller, scheduler, serverTime]
+      properties:
+        extractions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtractionEntry"
+        drivePoller:
+          $ref: "#/components/schemas/DrivePollerStatus"
+        scheduler:
+          $ref: "#/components/schemas/SchedulerStatus"
+        serverTime:
+          type: string
+          description: ISO timestamp from the server

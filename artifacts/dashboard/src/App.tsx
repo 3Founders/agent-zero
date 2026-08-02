@@ -1,17 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { QueryClient, QueryClientProvider, QueryCache, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
-import { setAuthTokenGetter, useGetSetupStatus, getGetSetupStatusQueryKey } from '@workspace/api-client-react';
+import { useGetSetupStatus, getGetSetupStatusQueryKey } from '@workspace/api-client-react';
 import { Loader2 } from 'lucide-react';
 
 import { Dashboard } from './pages/Dashboard';
 import { AuthGate } from './components/AuthGate';
 import { SetupWizard } from './pages/SetupWizard';
-import NotFound from '@/pages/not-found';
 
-function SetupGuard({ password, handleAuth }: { password: string | null, handleAuth: (p: string) => void }) {
+interface SetupGuardProps {
+  authHeader: string | null;
+  onAuth: (p: string) => void;
+  onLogout: () => void;
+}
+
+function SetupGuard({ authHeader, onAuth, onLogout }: SetupGuardProps) {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const { data: setupStatus, isLoading } = useGetSetupStatus();
@@ -27,11 +32,11 @@ function SetupGuard({ password, handleAuth }: { password: string | null, handleA
   // If setup isn't complete, force showing wizard regardless of route
   if (setupStatus && !setupStatus.allRequired) {
     return (
-      <SetupWizard 
+      <SetupWizard
         onComplete={() => {
           queryClient.invalidateQueries({ queryKey: getGetSetupStatusQueryKey() });
           setLocation('/');
-        }} 
+        }}
       />
     );
   }
@@ -39,37 +44,32 @@ function SetupGuard({ password, handleAuth }: { password: string | null, handleA
   return (
     <Switch>
       <Route path="/setup">
-        <SetupWizard 
+        <SetupWizard
           onComplete={() => {
             queryClient.invalidateQueries({ queryKey: getGetSetupStatusQueryKey() });
             setLocation('/');
-          }} 
+          }}
         />
       </Route>
       <Route path="/">
-        {!password && setupStatus?.adminPassword ? (
-          <AuthGate onAuthenticated={handleAuth} />
+        {!authHeader && setupStatus?.adminPassword ? (
+          <AuthGate onAuthenticated={onAuth} />
         ) : (
-          <Dashboard />
+          // Build the Basic auth header here and pass it down so every API call
+          // sends `Authorization: Basic <base64>` directly — bypassing the
+          // setAuthTokenGetter path which would prepend an extra "Bearer" prefix.
+          <Dashboard authHeader={authHeader ?? ''} onLogout={onLogout} />
         )}
       </Route>
-      <Route component={NotFound} />
     </Switch>
   );
 }
 
 export default function App() {
+  // Initialise synchronously from localStorage so there's no hydration flicker.
   const [password, setPassword] = useState<string | null>(
     () => localStorage.getItem('adminPassword')
   );
-
-  useEffect(() => {
-    if (password) {
-      setAuthTokenGetter(() => "Basic " + btoa("admin:" + password));
-    } else {
-      setAuthTokenGetter(null);
-    }
-  }, [password]);
 
   const handleAuth = (pwd: string) => {
     localStorage.setItem('adminPassword', pwd);
@@ -99,11 +99,13 @@ export default function App() {
     }
   }));
 
+  const authHeader = password ? 'Basic ' + btoa(':' + password) : null;
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <SetupGuard password={password} handleAuth={handleAuth} />
+          <SetupGuard authHeader={authHeader} onAuth={handleAuth} onLogout={clearAuth} />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

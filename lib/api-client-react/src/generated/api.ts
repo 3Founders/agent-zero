@@ -16,7 +16,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AdminExtractionsResponse,
   AdminStatus,
+  ErrorResponse,
   HealthStatus,
   SetupStatus
 } from './api.schemas';
@@ -204,6 +206,84 @@ export function useGetSetupStatus<TData = Awaited<ReturnType<typeof getSetupStat
 
 
 
+export const getGetAdminExtractionsUrl = () => {
+
+
+
+
+  return `/api/admin/extractions`
+}
+
+/**
+ * Returns all in-memory extraction results and Drive poller state. Protected by HTTP Basic Auth (ADMIN_PASSWORD env var).
+ * @summary List all extractions and poller state
+ */
+export const getAdminExtractions = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminExtractionsResponse> => {
+
+  return customFetch<AdminExtractionsResponse>(getGetAdminExtractionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminExtractionsQueryKey = () => {
+    return [
+    `/api/admin/extractions`
+    ] as const;
+    }
+
+
+export const getGetAdminExtractionsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminExtractions>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminExtractions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminExtractionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminExtractions>>> = ({ signal }) => getAdminExtractions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminExtractions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminExtractionsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminExtractions>>>
+export type GetAdminExtractionsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List all extractions and poller state
+ */
+
+export function useGetAdminExtractions<TData = Awaited<ReturnType<typeof getAdminExtractions>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminExtractions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminExtractionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetAdminStatusUrl = () => {
 
 
@@ -213,7 +293,7 @@ export const getGetAdminStatusUrl = () => {
 }
 
 /**
- * Returns all extraction results (from WhatsApp and Drive), Drive poller health, and scheduler state. Protected by ADMIN_PASSWORD basic auth.
+ * Returns all extraction results (flattened), Drive poller health, and scheduler state. Protected by HTTP Basic Auth (ADMIN_PASSWORD env var).
  * @summary Full system status snapshot
  */
 export const getAdminStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminStatus> => {
@@ -238,7 +318,7 @@ export const getGetAdminStatusQueryKey = () => {
     }
 
 
-export const getGetAdminStatusQueryOptions = <TData = Awaited<ReturnType<typeof getAdminStatus>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAdminStatusQueryOptions = <TData = Awaited<ReturnType<typeof getAdminStatus>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -257,14 +337,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetAdminStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminStatus>>>
-export type GetAdminStatusQueryError = ErrorType<void>
+export type GetAdminStatusQueryError = ErrorType<ErrorResponse>
 
 
 /**
  * @summary Full system status snapshot
  */
 
-export function useGetAdminStatus<TData = Awaited<ReturnType<typeof getAdminStatus>>, TError = ErrorType<void>>(
+export function useGetAdminStatus<TData = Awaited<ReturnType<typeof getAdminStatus>>, TError = ErrorType<ErrorResponse>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {

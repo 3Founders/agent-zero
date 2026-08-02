@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/coordinator-dashboard/"
+title = "Trial Coordinator Dashboard"
+description = "A web dashboard for trial coordinators to monitor lab result extraction submissions. Shows a live table of recent extractions with participant ID, timestamp, row count, source, and status (success/error). Failed extractions show their error reason for follow-up. Also displays Drive poller status (last run, files found/skipped). Auto-refreshes every 30 seconds."
+version = "1.0.0"
+id = "artifacts/coordinator-dashboard"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/coordinator-dashboard/" ]
+localPort = 19739
+
+[services.development]
+run = "pnpm --filter @workspace/coordinator-dashboard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/coordinator-dashboard", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/coordinator-dashboard/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19739"
+BASE_PATH = "/coordinator-dashboard/"

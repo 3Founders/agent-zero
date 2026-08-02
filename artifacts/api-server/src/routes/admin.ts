@@ -1,19 +1,32 @@
 /**
  * Admin API routes for the trial coordinator dashboard.
  *
- * GET /admin/status — full system status snapshot
+ * GET /admin/extractions  — extraction results + Drive poller state (task-5 frontend)
+ * GET /admin/status       — full system status snapshot (scheduler + poller + extractions)
  *
- * Protected by HTTP Basic auth. ADMIN_PASSWORD is read from the config store
- * (env var or data/config.json). If not set, the endpoint is open (dev/setup).
+ * Both routes are protected by requireAdminAuth (reads ADMIN_PASSWORD from the
+ * config store so the setup wizard can set it without a server restart).
+ * When ADMIN_PASSWORD is not yet configured the middleware is open — this is
+ * intentional for the initial setup wizard flow.
  */
 
 import { Router, type IRouter, type Request, type Response } from "express";
 import { peekResults } from "../lib/extractionStore.js";
-import { getDrivePollerStatus } from "../lib/drivePoller.js";
+import { getPollerState, getDrivePollerStatus } from "../lib/drivePoller.js";
 import { getSchedulerStatus } from "../lib/scheduler.js";
 import { requireAdminAuth } from "../lib/adminAuth.js";
 
 const router: IRouter = Router();
+
+// ─── GET /admin/extractions ───────────────────────────────────────────────────
+
+router.get("/admin/extractions", requireAdminAuth, (_req: Request, res: Response): void => {
+  res.json({
+    extractions: peekResults(),
+    poller: getPollerState(),
+    retrievedAt: new Date().toISOString(),
+  });
+});
 
 // ─── GET /admin/status ────────────────────────────────────────────────────────
 

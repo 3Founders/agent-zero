@@ -19,6 +19,86 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface ErrorResponse {
+  error: string;
+}
+
+export interface LabResultRow {
+  field: string;
+  /** @nullable */
+  value: string | null;
+  /** @nullable */
+  unit: string | null;
+  /** @nullable */
+  referenceRange: string | null;
+}
+
+export type ExtractionSuccessStatus = typeof ExtractionSuccessStatus[keyof typeof ExtractionSuccessStatus];
+
+
+export const ExtractionSuccessStatus = {
+  success: 'success',
+} as const;
+
+export type ExtractionSuccessSource = typeof ExtractionSuccessSource[keyof typeof ExtractionSuccessSource];
+
+
+export const ExtractionSuccessSource = {
+  whatsapp: 'whatsapp',
+  drive: 'drive',
+} as const;
+
+export interface ExtractionSuccess {
+  status: ExtractionSuccessStatus;
+  participantId: string;
+  messageId: string;
+  timestamp: string;
+  source: ExtractionSuccessSource;
+  rows: LabResultRow[];
+}
+
+export type ExtractionErrorStatus = typeof ExtractionErrorStatus[keyof typeof ExtractionErrorStatus];
+
+
+export const ExtractionErrorStatus = {
+  error: 'error',
+} as const;
+
+export type ExtractionErrorSource = typeof ExtractionErrorSource[keyof typeof ExtractionErrorSource];
+
+
+export const ExtractionErrorSource = {
+  whatsapp: 'whatsapp',
+  drive: 'drive',
+} as const;
+
+export interface ExtractionError {
+  status: ExtractionErrorStatus;
+  participantId: string;
+  messageId: string;
+  timestamp: string;
+  source: ExtractionErrorSource;
+  reason: string;
+}
+
+export type ExtractionResult = ExtractionSuccess | ExtractionError;
+
+export interface PollerState {
+  enabled: boolean;
+  /** @nullable */
+  lastRunTime: string | null;
+  filesFoundLastRun: number;
+  filesSkippedLastRun: number;
+  pendingRetryCount: number;
+  processedCount: number;
+}
+
+export interface AdminExtractionsResponse {
+  extractions: ExtractionResult[];
+  poller: PollerState;
+  retrievedAt: string;
+}
+
 export type ExtractionEntrySource = typeof ExtractionEntrySource[keyof typeof ExtractionEntrySource];
 
 

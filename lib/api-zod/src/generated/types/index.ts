@@ -6,11 +6,22 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './adminExtractionsResponse';
 export * from './adminStatus';
 export * from './drivePollerStatus';
+export * from './errorResponse';
 export * from './extractionEntry';
 export * from './extractionEntrySource';
 export * from './extractionEntryStatus';
+export * from './extractionError';
+export * from './extractionErrorSource';
+export * from './extractionErrorStatus';
+export * from './extractionResult';
+export * from './extractionSuccess';
+export * from './extractionSuccessSource';
+export * from './extractionSuccessStatus';
 export * from './healthStatus';
+export * from './labResultRow';
+export * from './pollerState';
 export * from './schedulerStatus';
 export * from './setupStatus';

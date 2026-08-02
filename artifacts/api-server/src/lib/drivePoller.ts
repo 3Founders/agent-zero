@@ -307,10 +307,14 @@ async function trySendDriveReply(
   }
 }
 
-// ─── Main poller ──────────────────────────────────────────────────────────────
-
-// ─── Poller status (readable by admin route) ─────────────────────────────────
-
+interface PollerState {
+  enabled: boolean;
+  lastRunTime: string | null;
+  filesFoundLastRun: number;
+  filesSkippedLastRun: number;
+  pendingRetryCount: number;
+  processedCount: number;
+}
 export interface DrivePollerStatus {
   running: boolean;
   folderId: string | null;
@@ -417,6 +421,9 @@ export async function startDrivePoller(
     });
 
     const allFiles = [...newFiles, ...filteredRetry];
+    _lastRunTime = tickStart;
+    _filesFoundLastRun = allFiles.length;
+    _filesSkippedLastRun = 0;
     logger.info(
       { new: newFiles.length, retry: filteredRetry.length },
       "Drive files this tick",
@@ -429,6 +436,7 @@ export async function startDrivePoller(
       if (alreadyDone && alreadyDone === file.modifiedTime) {
         pendingRetry.delete(file.id); // Clean up stale retry entry
         logger.debug({ fileId: file.id }, "Drive file already processed, skipping");
+        _filesSkippedLastRun++;
         continue;
       }
 
@@ -477,4 +485,21 @@ export async function startDrivePoller(
       logger.error({ err }, "Drive poll first tick failed"),
     )
     .finally(scheduleNext);
+}
+
+let _lastRunTime: string | null = null;
+
+let _filesFoundLastRun = 0;
+
+let _filesSkippedLastRun = 0;
+
+export function getPollerState(): PollerState {
+  return {
+    enabled: _pollerStarted && !!process.env.GOOGLE_DRIVE_FOLDER_ID,
+    lastRunTime: _lastRunTime,
+    filesFoundLastRun: _filesFoundLastRun,
+    filesSkippedLastRun: _filesSkippedLastRun,
+    pendingRetryCount: pendingRetry.size,
+    processedCount: processed.size,
+  };
 }

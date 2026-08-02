@@ -32,7 +32,44 @@ export const GetSetupStatusResponse = zod.object({
 
 
 /**
- * Returns all extraction results (from WhatsApp and Drive), Drive poller health, and scheduler state. Protected by ADMIN_PASSWORD basic auth.
+ * Returns all in-memory extraction results and Drive poller state. Protected by HTTP Basic Auth (ADMIN_PASSWORD env var).
+ * @summary List all extractions and poller state
+ */
+export const GetAdminExtractionsResponse = zod.object({
+  "extractions": zod.array(zod.union([zod.object({
+  "status": zod.enum(['success']),
+  "participantId": zod.string(),
+  "messageId": zod.string(),
+  "timestamp": zod.string(),
+  "source": zod.enum(['whatsapp', 'drive']),
+  "rows": zod.array(zod.object({
+  "field": zod.string(),
+  "value": zod.string().nullable(),
+  "unit": zod.string().nullable(),
+  "referenceRange": zod.string().nullable()
+}))
+}),zod.object({
+  "status": zod.enum(['error']),
+  "participantId": zod.string(),
+  "messageId": zod.string(),
+  "timestamp": zod.string(),
+  "source": zod.enum(['whatsapp', 'drive']),
+  "reason": zod.string()
+})])),
+  "poller": zod.object({
+  "enabled": zod.boolean(),
+  "lastRunTime": zod.string().nullable(),
+  "filesFoundLastRun": zod.number(),
+  "filesSkippedLastRun": zod.number(),
+  "pendingRetryCount": zod.number(),
+  "processedCount": zod.number()
+}),
+  "retrievedAt": zod.string()
+})
+
+
+/**
+ * Returns all extraction results (flattened), Drive poller health, and scheduler state. Protected by HTTP Basic Auth (ADMIN_PASSWORD env var).
  * @summary Full system status snapshot
  */
 export const GetAdminStatusResponse = zod.object({
