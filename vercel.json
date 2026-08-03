@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "installCommand": "pnpm install --frozen-lockfile --config.production=false",
+  "buildCommand": "echo 'No build step needed — Vercel bundles artifacts/api-server/api/*.ts directly from source'",
+  "functions": {
+    "artifacts/api-server/api/index.ts": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/artifacts/api-server/api"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/tick",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
