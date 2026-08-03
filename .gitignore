@@ -50,3 +50,6 @@ Thumbs.db
 
 # Setup wizard credential store (contains service account key)
 data/
+
+.env
+.env.local

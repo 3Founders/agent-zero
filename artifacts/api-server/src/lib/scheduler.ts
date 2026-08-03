@@ -126,7 +126,7 @@ async function sendReminders(slot: ReminderSlot): Promise<void> {
 
 // ─── Scheduler tick ───────────────────────────────────────────────────────────
 
-function tick(): void {
+export function tick(): void {
   const tz = getTimezone();
   const morning = parseTime("REMINDER_MORNING_TIME", "08:00");
   const evening = parseTime("REMINDER_EVENING_TIME", "20:00");

@@ -59,6 +59,17 @@ export async function saveConfig(
     }
   }
   _fileConfig = next;
+
+  // Serverless platforms (Vercel, etc.) ship a read-only filesystem outside
+  // /tmp and have no persistent disk across invocations — skip the write and
+  // rely entirely on env vars there. Local/Replit dev still gets the wizard.
+  if (process.env.VERCEL) {
+    logger.warn(
+      "Running on Vercel — config.json is not persisted. Set these as real environment variables in the Vercel project instead.",
+    );
+    return;
+  }
+
   await mkdir(join(process.cwd(), "data"), { recursive: true });
   await writeFile(CONFIG_PATH, JSON.stringify(_fileConfig, null, 2), "utf8");
   logger.info({ keys: Object.keys(updates) }, "Config saved to data/config.json");

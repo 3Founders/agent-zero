@@ -64,7 +64,10 @@ export async function extractLabResultsFromText(
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.6-luna", // cost-effective for high-volume extraction
+      // "gpt-5.6-luna" is a Replit AI Integrations model alias — off-platform
+      // (Vercel, etc.) set EXTRACTION_MODEL to a real model your key can
+      // access, e.g. "gpt-4o-mini" (OpenAI) or "sarvam-m" (Sarvam).
+      model: process.env.EXTRACTION_MODEL ?? "gpt-5.6-luna",
       max_completion_tokens: 8192,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
