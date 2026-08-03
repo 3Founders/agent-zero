@@ -12,14 +12,14 @@
  * `/api/cron/tick` (see ../src/routes/cron.ts and vercel.json).
  */
 
-import app from "../src/app.js";
-import { logger } from "../src/lib/logger.js";
-import { loadConfig, getConfigValue } from "../src/lib/configStore.js";
-import { ensureHeaderRow } from "../src/lib/sheetsSync.js";
+import app from "./app.js";
+import { logger } from "./lib/logger.js";
+import { loadConfig, getConfigValue } from "./lib/configStore.js";
+import { ensureHeaderRow } from "./lib/sheetsSync.js";
 import {
   ensureDemographicsSheets,
   loadParticipantsFromSheet,
-} from "../src/lib/demographicsSheet.js";
+} from "./lib/demographicsSheet.js";
 
 let initialized = false;
 
