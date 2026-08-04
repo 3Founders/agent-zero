@@ -70,6 +70,8 @@ async function buildAll() {
       "@google/*",
       "googleapis",
       "firebase-admin",
+      "pdf-to-img",
+      "pdfjs-dist",
       "@parcel/watcher",
       "@sentry/profiling-node",
       "@tree-sitter/*",
