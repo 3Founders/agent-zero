@@ -72,6 +72,8 @@ async function buildAll() {
       "firebase-admin",
       "pdf-to-img",
       "pdfjs-dist",
+      "@napi-rs/canvas",
+      "@napi-rs/canvas-*",
       "@parcel/watcher",
       "@sentry/profiling-node",
       "@tree-sitter/*",
